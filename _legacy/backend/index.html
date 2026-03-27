@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Poem Studio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:          #050710;
+      --panel:       #0b0f1c;
+      --accent:      #9f7aea;
+      --accent-soft: rgba(159,122,234,0.2);
+      --text:        #e5e9f0;
+      --muted:       #7e88a0;
+      --border:      #1f2433;
+    }
+
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+
+    body {
+      margin: 0; padding: 0;
+      background: radial-gradient(circle at top, #151932 0, #050710 55%, #000 100%);
+      color: var(--text);
+      display: flex; flex-direction: column; min-height: 100vh;
+    }
+
+    header {
+      padding: 0.6rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      background: linear-gradient(to bottom, rgba(5,7,16,0.9), rgba(5,7,16,0.6));
+      position: sticky; top: 0; z-index: 2;
+      display: flex; align-items: baseline; gap: 1rem;
+    }
+
+    header h1 { margin: 0; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+    #provider-badge {
+      font-size: 0.68rem;
+      color: var(--border);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
+    }
+
+    main {
+      flex: 1; display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr);
+      gap: 1rem; padding: 1rem;
+    }
+
+    @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+    .panel {
+      border-radius: 0.75rem; border: 1px solid var(--border);
+      background: radial-gradient(circle at top left, rgba(159,122,234,0.05), var(--panel));
+      padding: 0.75rem; position: relative; overflow: hidden;
+    }
+
+    .panel > h2 { margin: 0 0 0.5rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+
+    textarea {
+      width: 100%; min-height: 10rem;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 0.5rem; padding: 0.5rem; resize: vertical;
+      color: var(--text); outline: none;
+    }
+    textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); }
+
+    .field-label { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); margin: 0.5rem 0 0.25rem; }
+    .hint        { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; }
+
+    .button-row  { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
+
+    button {
+      border-radius: 999px; border: 1px solid var(--accent);
+      padding: 0.35rem 0.9rem;
+      background: radial-gradient(circle at top left, var(--accent-soft), #141322);
+      color: var(--text); font-size: 0.8rem; cursor: pointer;
+    }
+    button[disabled] { opacity: 0.45; cursor: default; }
+
+    /* small inline buttons */
+    .btn-small {
+      font-size: 0.7rem; padding: 0.2rem 0.55rem;
+      border-color: var(--border);
+      background: rgba(255,255,255,0.04);
+    }
+    .btn-accent { border-color: var(--accent); background: radial-gradient(circle at top left, var(--accent-soft), #141322); }
+
+    /* speak button */
+    .btn-speak {
+      font-size: 0.7rem; padding: 0.1rem 0.45rem;
+      border-color: var(--border);
+      background: rgba(255,255,255,0.04);
+      line-height: 1.2;
+    }
+
+    .status-pill { font-size: 0.75rem; color: var(--muted); }
+    .error       { color: #fecaca; font-size: 0.8rem; margin-top: 0.25rem; }
+
+    /* tabs */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
+    .tab  { padding: 0.35rem 0.75rem; font-size: 0.8rem; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .tab-panels { position: relative; height: calc(100% - 3rem); }
+    .tab-panel  { position: absolute; inset: 0; overflow: auto; font-size: 0.85rem; line-height: 1.4; display: none; white-space: pre-wrap; }
+    .tab-panel.active { display: block; }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    /* annotations */
+    .annotation { margin-bottom: 0.4rem; border-radius: 0.35rem; background: rgba(37,99,235,0.08); padding: 0.25rem 0.4rem; }
+    .annotation .stage { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #60a5fa; }
+    .annotation .lines { font-size: 0.75rem; color: var(--muted); }
+    .annotation .note  { font-size: 0.8rem; }
+
+    /* midjourney */
+    .prompt-block  { margin-bottom: 0.65rem; padding: 0.4rem 0.5rem; border-radius: 0.4rem; border: 1px solid var(--border); background: rgba(15,23,42,0.7); }
+    .prompt-header { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; }
+    .prompt-header h3 { font-size: 0.8rem; margin: 0; color: var(--muted); flex: 1; }
+    .prompt-text { font-size: 0.8rem; color: var(--text); word-break: break-word; white-space: pre-wrap; }
+
+    .img-area    { margin-top: 0.5rem; }
+    .img-loading { font-size: 0.75rem; color: var(--muted); }
+    .img-error   { font-size: 0.75rem; color: #fecaca; }
+    .generated-img { width: 100%; border-radius: 0.35rem; display: block; }
+
+    /* narration */
+    .cue-line     { margin-bottom: 0.5rem; }
+    .cue-meta-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.1rem; }
+    .cue-meta-row .meta { font-size: 0.75rem; color: var(--muted); flex: 1; }
+    .cue-line .text { font-size: 0.85rem; color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Poem Studio · draft</h1>
+    <span id="provider-badge"></span>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Poem &amp; references</h2>
+
+      <div class="field-label">Raw poem</div>
+      <textarea id="poem-input" placeholder="Paste or write your raw poem here..."></textarea>
+
+      <div class="field-label">Image hints (optional)</div>
+      <div class="hint">Mood, palette, visual world.</div>
+      <textarea id="image-hints" rows="3" placeholder="e.g. cold neon city at 3am, wet pavement, purple sodium haze..."></textarea>
+
+      <div class="field-label">Audio hints (optional)</div>
+      <div class="hint">Voice tone, pacing, emotional register.</div>
+      <textarea id="audio-hints" rows="3" placeholder="e.g. low, intimate, slightly hoarse, slow with long silences..."></textarea>
+
+      <div class="button-row">
+        <button id="run-btn">Compose</button>
+        <span id="status" class="status-pill">Idle.</span>
+      </div>
+      <div id="error" class="error"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Artifact</h2>
+      <div class="tabs">
+        <div class="tab active" data-tab="poem">Poem</div>
+        <div class="tab" data-tab="annotations">Annotations</div>
+        <div class="tab" data-tab="midjourney">Midjourney</div>
+        <div class="tab" data-tab="narration">Narration</div>
+      </div>
+      <div class="tab-panels">
+        <div id="panel-poem"        class="tab-panel active mono"></div>
+        <div id="panel-annotations" class="tab-panel"></div>
+        <div id="panel-midjourney"  class="tab-panel"></div>
+        <div id="panel-narration"   class="tab-panel mono"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
