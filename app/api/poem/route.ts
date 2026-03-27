@@ -16,7 +16,7 @@ async function callLLM(system: string, user: string): Promise<string> {
       model: gateway(TEXT_MODEL),
       system,
       messages: [{ role: 'user', content: user }],
-      maxTokens: 4096,
+      maxOutputTokens: 4096,
     });
     return text;
   }
