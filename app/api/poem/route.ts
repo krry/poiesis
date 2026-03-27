@@ -1,31 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateText } from 'ai';
-import { gateway } from '@ai-sdk/gateway';
 import { EDITOR_SYSTEM_PROMPT, buildEditorUserMessage } from '@/lib/editor-prompt';
 
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
-// On Vercel, VERCEL_OIDC_TOKEN is auto-injected — gateway needs no explicit key
-const ON_VERCEL     = !!process.env.VERCEL_ENV;
-
-// MODEL env var overrides the default for either path
-const MODEL_OVERRIDE = process.env.MODEL;
+// openrouter/free auto-routes to whichever free model has capacity — $0 cost
+const TEXT_MODEL = process.env.MODEL || 'openrouter/free';
 
 async function callLLM(system: string, user: string): Promise<string> {
-  if (ON_VERCEL) {
-    const model = MODEL_OVERRIDE || 'anthropic/claude-haiku-4.5';
-    const { text } = await generateText({
-      model: gateway(model),
-      system,
-      messages: [{ role: 'user', content: user }],
-      maxOutputTokens: 4096,
-    });
-    return text;
-  }
-
-  // Direct OpenRouter fallback (no gateway key); openrouter/free routes to
-  // whichever free model has capacity — no quota exhaustion on any single model
-  const model = MODEL_OVERRIDE || 'openrouter/free';
   const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -34,7 +15,7 @@ async function callLLM(system: string, user: string): Promise<string> {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model,
+      model: TEXT_MODEL,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -47,7 +28,7 @@ async function callLLM(system: string, user: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!ON_VERCEL && !OPENROUTER_KEY) {
+  if (!OPENROUTER_KEY) {
     return NextResponse.json({ error: 'No LLM API key configured' }, { status: 500 });
   }
 
