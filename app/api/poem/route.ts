@@ -6,14 +6,14 @@ import { EDITOR_SYSTEM_PROMPT, buildEditorUserMessage } from '@/lib/editor-promp
 const GATEWAY_KEY    = process.env.AI_GATEWAY_API_KEY;
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
-// Gateway: route to any provider/model via Vercel AI Gateway
-// Override with MODEL env var (e.g. "anthropic/claude-sonnet-4.6", "google/gemini-2.5-flash")
-const TEXT_MODEL = process.env.MODEL || 'anthropic/claude-haiku-4.5';
+// MODEL env var overrides the default for either path
+const MODEL_OVERRIDE = process.env.MODEL;
 
 async function callLLM(system: string, user: string): Promise<string> {
   if (GATEWAY_KEY) {
+    const model = MODEL_OVERRIDE || 'anthropic/claude-haiku-4.5';
     const { text } = await generateText({
-      model: gateway(TEXT_MODEL),
+      model: gateway(model),
       system,
       messages: [{ role: 'user', content: user }],
       maxOutputTokens: 4096,
@@ -21,7 +21,9 @@ async function callLLM(system: string, user: string): Promise<string> {
     return text;
   }
 
-  // Direct OpenRouter fallback (no gateway key)
+  // Direct OpenRouter fallback (no gateway key); openrouter/free routes to
+  // whichever free model has capacity — no quota exhaustion on any single model
+  const model = MODEL_OVERRIDE || 'openrouter/free';
   const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -30,7 +32,7 @@ async function callLLM(system: string, user: string): Promise<string> {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: TEXT_MODEL,
+      model,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
