@@ -39,6 +39,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Prompt too long (max 1,000 chars)' }, { status: 400 });
   }
 
-  const result = GOOGLE_KEY ? await geminiImage(prompt) : pollinationsImage(prompt);
+  let result: ImageResult;
+  if (GOOGLE_KEY) {
+    try {
+      result = await geminiImage(prompt);
+    } catch {
+      // Gemini failed (quota/rate-limit) — fall back to Pollinations
+      result = pollinationsImage(prompt);
+    }
+  } else {
+    result = pollinationsImage(prompt);
+  }
   return NextResponse.json(result);
 }
