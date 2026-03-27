@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-// Set env before importing route
-vi.stubEnv('ANTHROPIC_API_KEY', 'test-key');
+// Route uses OPENROUTER fallback when no gateway key is set
+vi.stubEnv('OPENROUTER_API_KEY', 'test-key');
 
 describe('POST /api/poem', () => {
   beforeEach(() => mockFetch.mockReset());
@@ -18,10 +18,11 @@ describe('POST /api/poem', () => {
       narration_script: [],
     };
 
+    // OpenRouter uses OpenAI-compatible response shape
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ type: 'text', text: JSON.stringify(fakeResult) }],
+        choices: [{ message: { content: JSON.stringify(fakeResult) } }],
       }),
     });
 
@@ -59,7 +60,7 @@ describe('POST /api/poem', () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ type: 'text', text: '```json\n' + JSON.stringify(fakeResult) + '\n```' }],
+        choices: [{ message: { content: '```json\n' + JSON.stringify(fakeResult) + '\n```' } }],
       }),
     });
 

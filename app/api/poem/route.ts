@@ -1,40 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { generateText } from 'ai';
+import { gateway } from '@ai-sdk/gateway';
 import { EDITOR_SYSTEM_PROMPT, buildEditorUserMessage } from '@/lib/editor-prompt';
 
-const ANTHROPIC_KEY  = process.env.ANTHROPIC_API_KEY;
+const GATEWAY_KEY    = process.env.AI_GATEWAY_API_KEY;
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
-const TEXT_PROVIDER  = ANTHROPIC_KEY ? 'anthropic' : 'openrouter';
-const DEFAULT_MODEL  = ANTHROPIC_KEY ? 'claude-sonnet-4-5' : 'openrouter/auto';
-const TEXT_MODEL     = process.env.MODEL || DEFAULT_MODEL;
+// Gateway: route to any provider/model via Vercel AI Gateway
+// Override with MODEL env var (e.g. "anthropic/claude-sonnet-4.6")
+const TEXT_MODEL = process.env.MODEL || 'openrouter/auto';
 
 async function callLLM(system: string, user: string): Promise<string> {
-  if (TEXT_PROVIDER === 'anthropic') {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_KEY!,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: TEXT_MODEL,
-        max_tokens: 4096,
-        system,
-        messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
-      }),
+  if (GATEWAY_KEY) {
+    const { text } = await generateText({
+      model: gateway(TEXT_MODEL),
+      system,
+      messages: [{ role: 'user', content: user }],
+      maxTokens: 4096,
     });
-    if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${await resp.text()}`);
-    const data = await resp.json();
-    return data.content?.[0]?.text ?? '';
+    return text;
   }
 
-  // OpenRouter (OpenAI-compatible)
+  // Direct OpenRouter fallback (no gateway key)
   const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${OPENROUTER_KEY}`,
-      'HTTP-Referer': 'https://poiesis.app',
+      'HTTP-Referer': 'https://poiesis.kerry.ink',
       'content-type': 'application/json',
     },
     body: JSON.stringify({
@@ -51,7 +43,7 @@ async function callLLM(system: string, user: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!ANTHROPIC_KEY && !OPENROUTER_KEY) {
+  if (!GATEWAY_KEY && !OPENROUTER_KEY) {
     return NextResponse.json({ error: 'No LLM API key configured' }, { status: 500 });
   }
 
@@ -72,7 +64,6 @@ export async function POST(req: NextRequest) {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    // Return raw for debugging if JSON parse fails
     return NextResponse.json({ raw }, { status: 200 });
   }
 
