@@ -7,8 +7,8 @@ const GATEWAY_KEY    = process.env.AI_GATEWAY_API_KEY;
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
 // Gateway: route to any provider/model via Vercel AI Gateway
-// Override with MODEL env var (e.g. "anthropic/claude-sonnet-4.6")
-const TEXT_MODEL = process.env.MODEL || 'openrouter/auto';
+// Override with MODEL env var (e.g. "anthropic/claude-sonnet-4.6", "google/gemini-2.5-flash")
+const TEXT_MODEL = process.env.MODEL || 'anthropic/claude-haiku-4.5';
 
 async function callLLM(system: string, user: string): Promise<string> {
   if (GATEWAY_KEY) {
