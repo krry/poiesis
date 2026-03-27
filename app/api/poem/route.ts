@@ -5,7 +5,7 @@ const ANTHROPIC_KEY  = process.env.ANTHROPIC_API_KEY;
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
 const TEXT_PROVIDER  = ANTHROPIC_KEY ? 'anthropic' : 'openrouter';
-const DEFAULT_MODEL  = ANTHROPIC_KEY ? 'claude-sonnet-4-5' : 'meta-llama/llama-3.3-70b-instruct:free';
+const DEFAULT_MODEL  = ANTHROPIC_KEY ? 'claude-sonnet-4-5' : 'openrouter/auto';
 const TEXT_MODEL     = process.env.MODEL || DEFAULT_MODEL;
 
 async function callLLM(system: string, user: string): Promise<string> {
