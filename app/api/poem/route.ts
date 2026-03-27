@@ -3,14 +3,16 @@ import { generateText } from 'ai';
 import { gateway } from '@ai-sdk/gateway';
 import { EDITOR_SYSTEM_PROMPT, buildEditorUserMessage } from '@/lib/editor-prompt';
 
-const GATEWAY_KEY    = process.env.AI_GATEWAY_API_KEY;
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+
+// On Vercel, VERCEL_OIDC_TOKEN is auto-injected — gateway needs no explicit key
+const ON_VERCEL     = !!process.env.VERCEL_ENV;
 
 // MODEL env var overrides the default for either path
 const MODEL_OVERRIDE = process.env.MODEL;
 
 async function callLLM(system: string, user: string): Promise<string> {
-  if (GATEWAY_KEY) {
+  if (ON_VERCEL) {
     const model = MODEL_OVERRIDE || 'anthropic/claude-haiku-4.5';
     const { text } = await generateText({
       model: gateway(model),
@@ -45,7 +47,7 @@ async function callLLM(system: string, user: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!GATEWAY_KEY && !OPENROUTER_KEY) {
+  if (!ON_VERCEL && !OPENROUTER_KEY) {
     return NextResponse.json({ error: 'No LLM API key configured' }, { status: 500 });
   }
 
