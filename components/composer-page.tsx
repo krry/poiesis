@@ -13,7 +13,7 @@ const FONTS = [
   { id: 'geist-mono',  label: 'Geist Mono' },
 ];
 
-const STEPS: Pipeline[] = ['editing', 'illustrating', 'narrating', 'done'];
+const STEPS: Pipeline[] = ['editing', 'illustrating', 'done'];
 const STEP_LABELS: Record<Pipeline, string> = {
   idle: 'idle', editing: 'Editor', illustrating: 'Illustrator',
   narrating: 'Narrator', done: 'Done', error: 'Error',
@@ -31,6 +31,7 @@ export default function ComposerPage() {
   const [result, setResult]       = useState<EditorResult | null>(null);
   const [activeTab, setActiveTab] = useState<'poem' | 'annotations' | 'images' | 'narration'>('poem');
   const [error, setError]         = useState('');
+  const [saveWarning, setSaveWarning] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   const busy = pipeline !== 'idle' && pipeline !== 'done' && pipeline !== 'error';
@@ -38,6 +39,7 @@ export default function ComposerPage() {
   async function compose() {
     if (!poem.trim()) { setError('Add at least one line of a poem.'); return; }
     setError('');
+    setSaveWarning('');
     setResult(null);
     setSessionId(null);
     setPipeline('editing');
@@ -63,6 +65,8 @@ export default function ComposerPage() {
       if (saveResp.ok) {
         const { id } = await saveResp.json();
         setSessionId(id);
+      } else {
+        setSaveWarning('Session could not be saved — results are still usable above.');
       }
 
       setPipeline('done');
@@ -164,6 +168,9 @@ export default function ComposerPage() {
 
           {error && (
             <p className="text-destructive text-sm">{error}</p>
+          )}
+          {saveWarning && (
+            <p className="text-yellow-500/80 text-xs">{saveWarning}</p>
           )}
 
           <div className="flex items-center gap-3 mt-auto pt-2">

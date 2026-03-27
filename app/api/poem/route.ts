@@ -59,6 +59,9 @@ export async function POST(req: NextRequest) {
   if (!poem?.trim()) {
     return NextResponse.json({ error: 'poem is required' }, { status: 400 });
   }
+  if (poem.length > 10_000) {
+    return NextResponse.json({ error: 'Poem too long (max 10,000 chars)' }, { status: 400 });
+  }
 
   const userMessage = buildEditorUserMessage(poem, styleHints, imageHints, audioHints);
 

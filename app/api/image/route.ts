@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
   if (!prompt?.trim()) {
     return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
   }
+  if (prompt.length > 1_000) {
+    return NextResponse.json({ error: 'Prompt too long (max 1,000 chars)' }, { status: 400 });
+  }
 
   const result = GOOGLE_KEY ? await geminiImage(prompt) : pollinationsImage(prompt);
   return NextResponse.json(result);

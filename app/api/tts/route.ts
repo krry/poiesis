@@ -46,12 +46,15 @@ async function fishAudio(text: string): Promise<{ buffer: ArrayBuffer; contentTy
 
 export async function POST(req: NextRequest) {
   if (!TTS_PROVIDER) {
-    return NextResponse.json({ error: 'No server TTS configured' }, { status: 400 });
+    return NextResponse.json({ error: 'No server TTS configured' }, { status: 503 });
   }
 
   const { text } = await req.json();
   if (!text?.trim()) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
+  }
+  if (text.length > 2_500) {
+    return NextResponse.json({ error: 'Text too long (max 2,500 chars)' }, { status: 400 });
   }
 
   const { buffer, contentType } = TTS_PROVIDER === 'elevenlabs'

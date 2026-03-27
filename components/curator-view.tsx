@@ -43,19 +43,26 @@ export default function CuratorView({ editorResult }: Props) {
   const [current, setCurrent] = useState(0);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Load image for a slide
+  // Load image for a slide. Uses functional setSlides to atomically check-and-set
+  // loading state, preventing stale-closure race conditions when called concurrently.
   const loadImage = useCallback(async (index: number) => {
-    const slide = slides[index];
-    if (!slide || slide.imageUrl || slide.loading) return;
+    let prompt = '';
+    setSlides(prev => {
+      const slide = prev[index];
+      if (!slide || slide.imageUrl || slide.loading) return prev; // already done or in-flight
+      prompt = slide.prompt;
+      return prev.map((s, i) => i === index ? { ...s, loading: true } : s);
+    });
+    if (!prompt) return;
 
-    setSlides(prev => prev.map((s, i) => i === index ? { ...s, loading: true } : s));
     try {
       const resp = await fetch('/api/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: slide.prompt }),
+        body: JSON.stringify({ prompt }),
       });
       if (!resp.ok) throw new Error();
       const data = await resp.json();
@@ -63,18 +70,27 @@ export default function CuratorView({ editorResult }: Props) {
     } catch {
       setSlides(prev => prev.map((s, i) => i === index ? { ...s, loading: false } : s));
     }
-  }, [slides]);
+  }, []); // stable ref — no stale closures; all reads go through functional setSlides
 
   // Preload current + next
   useEffect(() => {
     loadImage(current);
     if (current + 1 < slides.length) loadImage(current + 1);
-  }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [current, loadImage]);
 
   const navigate = useCallback((dir: 1 | -1) => {
     setCurrent(c => Math.max(0, Math.min(slides.length - 1, c + dir)));
     if (playing) stopAudio();
   }, [slides.length, playing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Revoke any outstanding blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+      audioRef.current?.pause();
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
 
   // Keyboard navigation
   useEffect(() => {
@@ -122,10 +138,12 @@ export default function CuratorView({ editorResult }: Props) {
       if (!resp.ok) throw new Error();
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.addEventListener('ended', () => {
         URL.revokeObjectURL(url);
+        blobUrlRef.current = null;
         setPlaying(false);
       });
       audio.play();
@@ -160,7 +178,7 @@ export default function CuratorView({ editorResult }: Props) {
       {slide?.imageUrl && (
         <div
           className="absolute inset-0 bg-cover bg-center transition-opacity duration-700"
-          style={{ backgroundImage: `url(${slide.imageUrl})` }}
+          style={{ backgroundImage: `url("${slide.imageUrl.replace(/"/g, '%22')}")` }}
         />
       )}
       {slide?.loading && (
