@@ -14,9 +14,13 @@ const TAG_TO_CLASS: [string, string][] = [
   ['Determiner',  'pos-det'],
 ];
 
-function posClass(tags: Record<string, boolean>): string {
+// compromise returns tags as string[] in recent versions
+function posClass(tags: string[] | Record<string, boolean>): string {
+  const has = Array.isArray(tags)
+    ? (t: string) => tags.includes(t)
+    : (t: string) => !!(tags as Record<string, boolean>)[t];
   for (const [tag, cls] of TAG_TO_CLASS) {
-    if (tags[tag]) return cls;
+    if (has(tag)) return cls;
   }
   return 'pos-other';
 }
@@ -30,7 +34,7 @@ async function tokenize(text: string): Promise<Token[]> {
   lines.forEach((line, i) => {
     if (line.trim()) {
       const doc = nlp(line);
-      const sentences: Array<{ terms: Array<{ text: string; pre: string; post: string; tags: Record<string, boolean> }> }>
+      const sentences: Array<{ terms: Array<{ text: string; pre: string; post: string; tags: string[] | Record<string, boolean> }> }>
         = doc.json();
       for (const sentence of sentences) {
         for (const term of sentence.terms) {

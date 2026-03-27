@@ -121,10 +121,14 @@ export default function CuratorView({ editorResult }: Props) {
   }, [navigate]);
 
   async function playNarration() {
-    const scriptLine = editorResult.narration_script.find(
-      l => l.lines[0] >= (editorResult.midjourney_prompts[current]?.lines[0] ?? 1)
+    const stanzaStart = editorResult.midjourney_prompts[current]?.lines[0] ?? 1;
+    const nextStanzaStart = editorResult.midjourney_prompts[current + 1]?.lines[0] ?? Infinity;
+    // Collect all narration lines that fall within this stanza's line range
+    const scriptLines = editorResult.narration_script.filter(
+      l => l.lines[0] >= stanzaStart && l.lines[0] < nextStanzaStart
     );
-    if (!scriptLine) return;
+    if (!scriptLines.length) return;
+    const fullText = scriptLines.map(l => l.text).join(' ');
 
     stopAudio();
     setPlaying(true);
@@ -133,7 +137,7 @@ export default function CuratorView({ editorResult }: Props) {
       const resp = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: scriptLine.text }),
+        body: JSON.stringify({ text: fullText }),
       });
       if (!resp.ok) throw new Error();
       const blob = await resp.blob();
@@ -151,7 +155,7 @@ export default function CuratorView({ editorResult }: Props) {
       setPlaying(false);
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        const utt = new SpeechSynthesisUtterance(scriptLine.text);
+        const utt = new SpeechSynthesisUtterance(fullText);
         utt.rate = 0.9;
         utt.addEventListener('end', () => setPlaying(false));
         window.speechSynthesis.speak(utt);
