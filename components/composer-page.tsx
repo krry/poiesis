@@ -11,6 +11,7 @@ interface OracleCard {
   body: string;
   keywords?: string[];
   deck?: string;
+  suit?: string;
 }
 
 const FONTS = [
@@ -53,6 +54,7 @@ export default function ComposerPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [drawnCard, setDrawnCard] = useState<OracleCard | null>(null);
   const [drawing, setDrawing] = useState(false);
+  const [inspirationCard, setInspirationCard] = useState<OracleCard | null>(null);
 
   async function drawCard() {
     setDrawing(true);
@@ -61,14 +63,15 @@ export default function ComposerPage() {
       if (!resp.ok) throw new Error();
       const data = await resp.json();
       const raw = data.cards?.[0];
-      if (raw) setDrawnCard({ title: raw.title, body: raw.body, keywords: raw.keywords, deck: raw.deck_id ?? raw.deck });
+      if (raw) setDrawnCard({ title: raw.title, body: raw.body, keywords: raw.keywords, deck: raw.deck_id ?? raw.deck, suit: raw.suit });
     } finally {
       setDrawing(false);
     }
   }
 
-  function useCard(cardPoem: string) {
-    setPoem(cardPoem);
+  function useCard(card: OracleCard) {
+    setPoem(card.body);
+    setInspirationCard(card);
     setDrawnCard(null);
   }
 
@@ -254,6 +257,7 @@ export default function ComposerPage() {
                 onUse={useCard}
                 font={FONT_VARS[font] ?? FONT_VARS.inconsolata}
               />
+
             )}
             {!result && busy && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -278,7 +282,7 @@ export default function ComposerPage() {
             )}
 
             {result && (
-              <IntegratedView result={result} font={font} />
+              <IntegratedView result={result} font={font} inspirationCard={inspirationCard} />
             )}
           </div>
         </div>
@@ -302,7 +306,7 @@ function SingToMe({
   card: OracleCard | null;
   drawing: boolean;
   onDraw: () => void;
-  onUse: (poem: string) => void;
+  onUse: (card: OracleCard) => void;
   font: string;
 }) {
   const [revealed, setRevealed] = useState(false);
@@ -376,7 +380,7 @@ function SingToMe({
         ].join(' ')}
       >
         <button
-          onClick={() => onUse(card.body)}
+          onClick={() => onUse(card)}
           className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
         >
           Write from here
@@ -422,7 +426,7 @@ function parseStanzas(polished: string): StanzaBlock[] {
   return out;
 }
 
-function IntegratedView({ result, font }: { result: EditorResult; font: string }) {
+function IntegratedView({ result, font, inspirationCard }: { result: EditorResult; font: string; inspirationCard: OracleCard | null }) {
   const fontFamily = FONT_VARS[font] ?? FONT_VARS.inconsolata;
 
   // image state keyed by stanza number (from midjourney_prompts[n].stanza)
@@ -439,6 +443,31 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
   }, []);
 
   const stanzas = useMemo(() => parseStanzas(result.polished), [result.polished]);
+
+  // ── Suno export ───────────────────────────────────────────────────────────
+  const [sunoState, setSunoState] = useState<
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'done'; style: string; lyrics: string; meta: { mode: string; element: string; quality: string | null } }
+    | { status: 'error'; message: string }
+  >({ status: 'idle' });
+
+  async function exportToSuno() {
+    if (!inspirationCard) return;
+    setSunoState({ status: 'loading' });
+    try {
+      const resp = await fetch('/api/suno', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card: inspirationCard, poem: result.polished }),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const data = await resp.json();
+      setSunoState({ status: 'done', style: data.style, lyrics: data.lyrics, meta: data.meta });
+    } catch (e) {
+      setSunoState({ status: 'error', message: String(e) });
+    }
+  }
 
   async function generateImage(stanzaNum: number, prompt: string) {
     setImages(prev => ({ ...prev, [stanzaNum]: { loading: true } }));
@@ -500,7 +529,16 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
       {/* Raw poem hidden — preserved for agents and scrapers */}
       <pre aria-hidden className="sr-only">{result.polished}</pre>
 
+      {inspirationCard && (
+        <SunoExport
+          state={sunoState}
+          cardTitle={inspirationCard.title}
+          onExport={exportToSuno}
+        />
+      )}
+
       {stanzas.map((stanza, si) => {
+
         const stanzaEnd = stanza.startLine + stanza.lines.length - 1;
 
         // Midjourney prompt whose line range starts in this stanza
@@ -591,6 +629,95 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── Suno Export ────────────────────────────────────────────────────────────────
+
+type SunoState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'done'; style: string; lyrics: string; meta: { mode: string; element: string; quality: string | null } }
+  | { status: 'error'; message: string };
+
+function SunoExport({ state, cardTitle, onExport }: {
+  state: SunoState;
+  cardTitle: string;
+  onExport: () => void;
+}) {
+  const [copiedStyle, setCopiedStyle] = useState(false);
+  const [copiedLyrics, setCopiedLyrics] = useState(false);
+
+  function copy(text: string, which: 'style' | 'lyrics') {
+    navigator.clipboard.writeText(text).then(() => {
+      if (which === 'style') { setCopiedStyle(true); setTimeout(() => setCopiedStyle(false), 1800); }
+      else                   { setCopiedLyrics(true); setTimeout(() => setCopiedLyrics(false), 1800); }
+    });
+  }
+
+  return (
+    <div className="border-t border-border/30 pt-6 mt-2 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-widest text-muted-foreground/50">
+          To music
+        </span>
+        {state.status === 'idle' || state.status === 'error' ? (
+          <button
+            onClick={onExport}
+            className="px-3 py-1 rounded-full border border-border text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+          >
+            Build for Suno
+          </button>
+        ) : state.status === 'loading' ? (
+          <span className="text-xs text-muted-foreground/50 animate-pulse">Composing…</span>
+        ) : (
+          <span className="text-xs text-muted-foreground/40">
+            {state.meta.element} · {state.meta.mode}
+            {state.meta.quality ? ` · ${state.meta.quality}` : ''}
+          </span>
+        )}
+      </div>
+
+      {state.status === 'error' && (
+        <p className="text-xs text-destructive/70">{state.message}</p>
+      )}
+
+      {state.status === 'done' && (
+        <div className="flex flex-col gap-3">
+          {/* Style prompt */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40">Style</span>
+              <button
+                onClick={() => copy(state.style, 'style')}
+                className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              >
+                {copiedStyle ? 'copied' : 'copy'}
+              </button>
+            </div>
+            <p className="text-xs font-mono text-foreground/70 bg-muted/20 rounded px-3 py-2 leading-relaxed">
+              {state.style}
+            </p>
+          </div>
+
+          {/* Lyrics */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40">Lyrics</span>
+              <button
+                onClick={() => copy(state.lyrics, 'lyrics')}
+                className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              >
+                {copiedLyrics ? 'copied' : 'copy'}
+              </button>
+            </div>
+            <pre className="text-xs font-mono text-foreground/70 bg-muted/20 rounded px-3 py-2 whitespace-pre-wrap leading-relaxed">
+              {state.lyrics}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

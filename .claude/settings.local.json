@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(trash:*)",
+      "WebFetch(domain:www.poetryfoundation.org)",
+      "WebFetch(domain:www.gutenberg.org)",
+      "WebFetch(domain:poets.org)",
+      "WebSearch",
+      "WebFetch(domain:americanliterature.com)",
+      "WebFetch(domain:www.poetryverse.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:en.wikisource.org)",
+      "WebFetch(domain:lcenglishhub.ie)",
+      "WebFetch(domain:victorianweb.org)",
+      "WebFetch(domain:ficml.org)",
+      "Bash(curl -s \"https://www.gutenberg.org/cache/epub/1322/pg1322.txt\")",
+      "Bash(curl -sL \"https://www.gutenberg.org/cache/epub/1322/pg1322.txt\")",
+      "Bash(curl -sL https://www.gutenberg.org/cache/epub/2490/pg2490.txt)",
+      "Bash(curl -sL \"https://www.gutenberg.org/cache/epub/23684/pg23684.txt\")"
+    ]
+  }
+}
