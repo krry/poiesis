@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PoetryEditor from './poetry-editor';
 import type { EditorResult, Pipeline } from '@/lib/types';
@@ -13,10 +13,22 @@ const FONTS = [
   { id: 'geist-mono',  label: 'Geist Mono' },
 ];
 
+const FONT_VARS: Record<string, string> = {
+  inconsolata:  'var(--font-inconsolata)',
+  'fira-code':  'var(--font-fira-code)',
+  recursive:    'var(--font-recursive)',
+  'geist-mono': 'var(--font-geist-mono)',
+};
+
 const STEPS: Pipeline[] = ['editing', 'illustrating', 'done'];
 const STEP_LABELS: Record<Pipeline, string> = {
   idle: 'idle', editing: 'Editor', illustrating: 'Illustrator',
   narrating: 'Narrator', done: 'Done', error: 'Error',
+};
+
+// Progress bar fills across the pipeline stages
+const PIPELINE_PCT: Record<Pipeline, number> = {
+  idle: 0, editing: 30, illustrating: 70, narrating: 85, done: 100, error: 100,
 };
 
 export default function ComposerPage() {
@@ -29,7 +41,6 @@ export default function ComposerPage() {
   const [font, setFont]           = useState('inconsolata');
   const [pipeline, setPipeline]   = useState<Pipeline>('idle');
   const [result, setResult]       = useState<EditorResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'poem' | 'annotations' | 'images' | 'narration'>('poem');
   const [error, setError]         = useState('');
   const [saveWarning, setSaveWarning] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -70,12 +81,13 @@ export default function ComposerPage() {
       }
 
       setPipeline('done');
-      setActiveTab('poem');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setPipeline('error');
     }
   }
+
+  const pct = PIPELINE_PCT[pipeline];
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
@@ -186,9 +198,9 @@ export default function ComposerPage() {
             {sessionId && (
               <button
                 onClick={() => router.push(`/read/${sessionId}`)}
-                className="px-5 py-2 rounded-full border border-border text-sm hover:bg-muted/50 transition-colors"
+                className="px-4 py-2 rounded-full border border-border text-sm hover:bg-muted/50 transition-colors flex items-center gap-1.5"
               >
-                View in Poiesis →
+                ▶ Play
               </button>
             )}
           </div>
@@ -196,22 +208,15 @@ export default function ComposerPage() {
 
         {/* Right: results */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Tab bar */}
-          <div className="flex border-b border-border shrink-0">
-            {(['poem', 'annotations', 'images', 'narration'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={[
-                  'px-4 py-2.5 text-xs uppercase tracking-widest transition-colors',
-                  activeTab === tab
-                    ? 'text-foreground border-b-2 border-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                ].join(' ')}
-              >
-                {tab}
-              </button>
-            ))}
+          {/* Progress bar */}
+          <div className="h-0.5 bg-border shrink-0 relative overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 bg-primary transition-all duration-700"
+              style={{ width: `${pct}%`, opacity: pipeline === 'idle' ? 0 : 1 }}
+            />
+            {busy && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/40 to-transparent animate-[shimmer_1.5s_ease-in-out_infinite]" />
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-6">
@@ -219,69 +224,93 @@ export default function ComposerPage() {
               <p className="text-muted-foreground text-sm">Results will appear here after you compose.</p>
             )}
             {!result && busy && (
-              <p className="text-muted-foreground text-sm animate-pulse">{STEP_LABELS[pipeline]}…</p>
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <div className="flex gap-2">
+                  {STEPS.map(step => (
+                    <span
+                      key={step}
+                      className={[
+                        'text-xs uppercase tracking-widest',
+                        pipeline === step
+                          ? 'text-foreground animate-pulse'
+                          : STEPS.indexOf(step) < STEPS.indexOf(pipeline)
+                            ? 'text-muted-foreground/50'
+                            : 'text-muted-foreground/20',
+                      ].join(' ')}
+                    >
+                      {STEP_LABELS[step]}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
 
-            {result && activeTab === 'poem' && (
-              <PoemPanel result={result} font={font} />
-            )}
-            {result && activeTab === 'annotations' && (
-              <AnnotationsPanel result={result} />
-            )}
-            {result && activeTab === 'images' && (
-              <ImagesPanel result={result} />
-            )}
-            {result && activeTab === 'narration' && (
-              <NarrationPanel result={result} />
+            {result && (
+              <IntegratedView result={result} font={font} />
             )}
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes shimmer {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+      `}</style>
     </div>
   );
 }
 
-// ── Sub-panels ────────────────────────────────────────────────────────────────
+// ── Integrated poem + annotations + images + narration ─────────────────────────
 
-function PoemPanel({ result, font }: { result: EditorResult; font: string }) {
-  const fontVar = {
-    inconsolata: 'var(--font-inconsolata)',
-    'fira-code':  'var(--font-fira-code)',
-    recursive:   'var(--font-recursive)',
-    'geist-mono': 'var(--font-geist-mono)',
-  }[font] ?? 'var(--font-inconsolata)';
-
-  return (
-    <pre
-      className="text-foreground leading-loose whitespace-pre-wrap"
-      style={{ fontFamily: fontVar, fontSize: '1rem', lineHeight: '1.9' }}
-    >
-      {result.polished}
-    </pre>
-  );
+interface StanzaBlock {
+  lines: string[];
+  startLine: number; // 1-based
 }
 
-function AnnotationsPanel({ result }: { result: EditorResult }) {
-  return (
-    <div className="flex flex-col gap-3">
-      {result.annotations.map((ann, i) => (
-        <div key={i} className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-xs uppercase tracking-wider text-blue-400 font-medium">{ann.stage}</span>
-            <span className="text-xs text-muted-foreground">lines {ann.lines[0]}–{ann.lines[1]}</span>
-          </div>
-          <p className="text-sm text-foreground/80">{ann.note}</p>
-        </div>
-      ))}
-    </div>
-  );
+function parseStanzas(polished: string): StanzaBlock[] {
+  const allLines = polished.split('\n');
+  const out: StanzaBlock[] = [];
+  let current: string[] = [];
+  let stanzaStart = 1;
+  let lineNum = 1;
+  for (const line of allLines) {
+    if (line.trim() === '') {
+      if (current.length) {
+        out.push({ lines: current, startLine: stanzaStart });
+        current = [];
+        stanzaStart = lineNum + 1;
+      }
+    } else {
+      current.push(line);
+    }
+    lineNum++;
+  }
+  if (current.length) out.push({ lines: current, startLine: stanzaStart });
+  return out;
 }
 
-function ImagesPanel({ result }: { result: EditorResult }) {
+function IntegratedView({ result, font }: { result: EditorResult; font: string }) {
+  const fontFamily = FONT_VARS[font] ?? FONT_VARS.inconsolata;
+
+  // image state keyed by stanza number (from midjourney_prompts[n].stanza)
   const [images, setImages] = useState<Record<number, { url?: string; loading?: boolean; error?: string }>>({});
+  // which narration entry index is playing (-1 = none)
+  const [playingIdx, setPlayingIdx] = useState(-1);
+  const audioRef   = useRef<HTMLAudioElement | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
-  async function generate(stanza: number, prompt: string) {
-    setImages(prev => ({ ...prev, [stanza]: { loading: true } }));
+  useEffect(() => () => {
+    audioRef.current?.pause();
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    window.speechSynthesis?.cancel();
+  }, []);
+
+  const stanzas = useMemo(() => parseStanzas(result.polished), [result.polished]);
+
+  async function generateImage(stanzaNum: number, prompt: string) {
+    setImages(prev => ({ ...prev, [stanzaNum]: { loading: true } }));
     try {
       const resp = await fetch('/api/image', {
         method: 'POST',
@@ -290,52 +319,21 @@ function ImagesPanel({ result }: { result: EditorResult }) {
       });
       if (!resp.ok) throw new Error(await resp.text());
       const data = await resp.json();
-      setImages(prev => ({ ...prev, [stanza]: { url: data.value } }));
+      setImages(prev => ({ ...prev, [stanzaNum]: { url: data.value } }));
     } catch (err) {
-      setImages(prev => ({ ...prev, [stanza]: { error: String(err) } }));
+      setImages(prev => ({ ...prev, [stanzaNum]: { error: String(err) } }));
     }
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      {result.midjourney_prompts.map((p) => (
-        <div key={p.stanza} className="rounded-lg border border-border bg-card overflow-hidden">
-          <div className="flex items-start justify-between gap-3 p-4">
-            <div>
-              <span className="text-xs uppercase tracking-wider text-muted-foreground">Stanza {p.stanza}</span>
-              <p className="text-sm mt-1 text-foreground/80">{p.prompt}</p>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <button
-                onClick={() => navigator.clipboard.writeText(p.prompt)}
-                className="px-2.5 py-1 text-xs border border-border rounded-md hover:bg-muted/50"
-              >
-                Copy
-              </button>
-              <button
-                onClick={() => generate(p.stanza, p.prompt)}
-                disabled={images[p.stanza]?.loading}
-                className="px-2.5 py-1 text-xs border border-border rounded-md hover:bg-muted/50 disabled:opacity-40"
-              >
-                {images[p.stanza]?.loading ? '…' : 'Generate'}
-              </button>
-            </div>
-          </div>
-          {images[p.stanza]?.url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={images[p.stanza].url} alt={`Stanza ${p.stanza}`} className="w-full" />
-          )}
-          {images[p.stanza]?.error && (
-            <p className="px-4 pb-3 text-xs text-destructive">{images[p.stanza].error}</p>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
+  async function toggleNarration(idx: number, text: string) {
+    // stop whatever is playing
+    audioRef.current?.pause();
+    if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null; }
+    window.speechSynthesis?.cancel();
 
-function NarrationPanel({ result }: { result: EditorResult }) {
-  async function speak(text: string) {
+    if (playingIdx === idx) { setPlayingIdx(-1); return; } // toggle off
+    setPlayingIdx(idx);
+
     try {
       const resp = await fetch('/api/tts', {
         method: 'POST',
@@ -345,36 +343,123 @@ function NarrationPanel({ result }: { result: EditorResult }) {
       if (!resp.ok) throw new Error();
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
       const audio = new Audio(url);
-      audio.addEventListener('ended', () => URL.revokeObjectURL(url));
+      audioRef.current = audio;
+      audio.addEventListener('ended', () => {
+        URL.revokeObjectURL(url);
+        blobUrlRef.current = null;
+        setPlayingIdx(-1);
+      });
       audio.play();
     } catch {
-      // fallback to browser speech
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(text), { rate: 0.9 }));
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.rate = 0.9;
+        utt.addEventListener('end', () => setPlayingIdx(-1));
+        window.speechSynthesis.speak(utt);
+      } else {
+        setPlayingIdx(-1);
       }
     }
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      {result.narration_script.map((line, i) => (
-        <div key={i} className="flex items-start gap-3 py-2 border-b border-border/50 last:border-0">
-          <button
-            onClick={() => speak(line.text)}
-            className="mt-0.5 shrink-0 w-6 h-6 flex items-center justify-center rounded-full border border-border text-xs hover:bg-muted/50"
-          >
-            ▶
-          </button>
-          <div>
-            <div className="text-xs text-muted-foreground mb-0.5">
-              lines {line.lines[0]}–{line.lines[1]} <span className="text-blue-400/70">{line.cue}</span>
+    <div className="flex flex-col gap-8">
+      {/* Raw poem hidden — preserved for agents and scrapers */}
+      <pre aria-hidden className="sr-only">{result.polished}</pre>
+
+      {stanzas.map((stanza, si) => {
+        const stanzaEnd = stanza.startLine + stanza.lines.length - 1;
+
+        // Midjourney prompt whose line range starts in this stanza
+        const mjp = result.midjourney_prompts.find(
+          p => p.lines[0] >= stanza.startLine && p.lines[0] <= stanzaEnd,
+        );
+
+        // All narration entries that start in this stanza
+        const narLines = result.narration_script.filter(
+          n => n.lines[0] >= stanza.startLine && n.lines[0] <= stanzaEnd,
+        );
+        // Combined text for TTS; index in the full array for play-state tracking
+        const narText = narLines.map(n => n.text).join(' ');
+        const narIdx  = narLines.length
+          ? result.narration_script.indexOf(narLines[0])
+          : -1;
+
+        // Annotations that overlap with this stanza's line range
+        const anns = result.annotations.filter(
+          a => a.lines[0] <= stanzaEnd && a.lines[1] >= stanza.startLine,
+        );
+
+        const img = mjp ? images[mjp.stanza] : undefined;
+
+        return (
+          <div key={si} className="flex flex-col gap-1.5">
+            <div className="flex gap-3 items-start">
+              {/* Leading thumbnail */}
+              <div className="shrink-0 w-14 h-14 rounded-md overflow-hidden border border-border/60 bg-muted/20 flex items-center justify-center">
+                {img?.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                ) : img?.loading ? (
+                  <span className="text-muted-foreground/40 text-xs animate-pulse">…</span>
+                ) : mjp ? (
+                  <button
+                    onClick={() => generateImage(mjp.stanza, mjp.prompt)}
+                    title={mjp.prompt}
+                    className="w-full h-full flex items-center justify-center text-muted-foreground/30 hover:text-muted-foreground/70 text-base transition-colors"
+                  >
+                    +
+                  </button>
+                ) : null}
+              </div>
+
+              {/* Lines */}
+              <div className="flex-1 min-w-0">
+                {stanza.lines.map((line, li) => {
+                  const isLast = li === stanza.lines.length - 1;
+                  return (
+                    <div key={li} className="flex items-baseline justify-between gap-2 group/line">
+                      <span
+                        style={{ fontFamily, fontSize: '1rem', lineHeight: '1.9' }}
+                        className="text-foreground"
+                      >
+                        {line || '\u00a0'}
+                      </span>
+                      {isLast && narIdx >= 0 && (
+                        <button
+                          onClick={() => toggleNarration(narIdx, narText)}
+                          className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full border border-border/50 text-muted-foreground/50 hover:text-foreground hover:border-border transition-colors text-[10px] opacity-0 group-hover/line:opacity-100 focus:opacity-100"
+                        >
+                          {playingIdx === narIdx ? '⏹' : '▶'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <p className="text-sm">{line.text}</p>
+
+            {/* Annotations below stanza, indented past the thumbnail */}
+            {anns.length > 0 && (
+              <div className="pl-[68px] flex flex-col gap-1">
+                {anns.map((ann, ai) => (
+                  <div key={ai} className="flex items-start gap-2 text-xs">
+                    <span className="text-blue-400/70 uppercase tracking-wider shrink-0 pt-px">{ann.stage}</span>
+                    <span className="text-muted-foreground leading-relaxed">{ann.note}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Image error */}
+            {img?.error && (
+              <p className="pl-[68px] text-xs text-destructive/70">{img.error}</p>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

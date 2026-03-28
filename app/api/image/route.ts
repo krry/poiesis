@@ -3,11 +3,19 @@ import { NextRequest, NextResponse } from 'next/server';
 const GOOGLE_KEY         = process.env.GOOGLE_API_KEY;
 const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.0-flash-preview-image-generation';
 
-type ImageResult = { type: 'url'; value: string } | { type: 'b64'; value: string };
+type ImageResult = { type: 'b64'; value: string };
 
-function pollinationsImage(prompt: string): ImageResult {
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&nologo=true`;
-  return { type: 'url', value: url };
+// Proxy Pollinations server-side — their nologo param now requires auth on the
+// new gen.pollinations.ai subdomain, causing 401s when the browser fetches directly.
+async function pollinationsImage(prompt: string): Promise<ImageResult> {
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&seed=${seed}`;
+  const resp = await fetch(url, { headers: { Referer: 'https://poiesis.kerry.ink' } });
+  if (!resp.ok) throw new Error(`Pollinations ${resp.status}`);
+  const mime = resp.headers.get('content-type') ?? 'image/jpeg';
+  const buf = await resp.arrayBuffer();
+  const b64 = Buffer.from(buf).toString('base64');
+  return { type: 'b64', value: `data:${mime};base64,${b64}` };
 }
 
 async function geminiImage(prompt: string): Promise<ImageResult> {
@@ -40,15 +48,19 @@ export async function POST(req: NextRequest) {
   }
 
   let result: ImageResult;
-  if (GOOGLE_KEY) {
-    try {
-      result = await geminiImage(prompt);
-    } catch {
-      // Gemini failed (quota/rate-limit) — fall back to Pollinations
-      result = pollinationsImage(prompt);
+  try {
+    result = GOOGLE_KEY ? await geminiImage(prompt) : await pollinationsImage(prompt);
+  } catch {
+    if (GOOGLE_KEY) {
+      // Gemini failed — try Pollinations
+      try {
+        result = await pollinationsImage(prompt);
+      } catch {
+        return NextResponse.json({ error: 'Image generation unavailable' }, { status: 503 });
+      }
+    } else {
+      return NextResponse.json({ error: 'Image generation unavailable' }, { status: 503 });
     }
-  } else {
-    result = pollinationsImage(prompt);
   }
   return NextResponse.json(result);
 }
