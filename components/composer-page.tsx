@@ -6,6 +6,13 @@ import PoetryEditor from './poetry-editor';
 import type { EditorResult, Pipeline } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 
+interface OracleCard {
+  title: string;
+  body: string;
+  keywords?: string[];
+  deck?: string;
+}
+
 const FONTS = [
   { id: 'inconsolata', label: 'Inconsolata' },
   { id: 'fira-code',   label: 'Fira Code' },
@@ -44,6 +51,26 @@ export default function ComposerPage() {
   const [error, setError]         = useState('');
   const [saveWarning, setSaveWarning] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [drawnCard, setDrawnCard] = useState<OracleCard | null>(null);
+  const [drawing, setDrawing] = useState(false);
+
+  async function drawCard() {
+    setDrawing(true);
+    try {
+      const resp = await fetch('/api/draw');
+      if (!resp.ok) throw new Error();
+      const data = await resp.json();
+      const raw = data.cards?.[0];
+      if (raw) setDrawnCard({ title: raw.title, body: raw.body, keywords: raw.keywords, deck: raw.deck_id ?? raw.deck });
+    } finally {
+      setDrawing(false);
+    }
+  }
+
+  function useCard(cardPoem: string) {
+    setPoem(cardPoem);
+    setDrawnCard(null);
+  }
 
   const busy = pipeline !== 'idle' && pipeline !== 'done' && pipeline !== 'error';
 
@@ -96,24 +123,6 @@ export default function ComposerPage() {
         <span className="text-sm font-semibold tracking-widest uppercase text-muted-foreground">
           Poiesis
         </span>
-
-        {/* Font selector */}
-        <div className="flex gap-1">
-          {FONTS.map(f => (
-            <button
-              key={f.id}
-              onClick={() => setFont(f.id)}
-              className={[
-                'px-2.5 py-1 text-xs rounded-md transition-colors',
-                font === f.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
 
         {/* Pipeline status */}
         <div className="flex items-center gap-1.5">
@@ -203,6 +212,23 @@ export default function ComposerPage() {
                 ▶ Play
               </button>
             )}
+
+            <div className="flex gap-1 ml-auto">
+              {FONTS.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setFont(f.id)}
+                  className={[
+                    'px-2.5 py-1 text-xs rounded-md transition-colors',
+                    font === f.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
+                  ].join(' ')}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -221,7 +247,13 @@ export default function ComposerPage() {
 
           <div className="flex-1 overflow-y-auto p-6">
             {!result && pipeline === 'idle' && (
-              <p className="text-muted-foreground text-sm">Results will appear here after you compose.</p>
+              <SingToMe
+                card={drawnCard}
+                drawing={drawing}
+                onDraw={drawCard}
+                onUse={useCard}
+                font={FONT_VARS[font] ?? FONT_VARS.inconsolata}
+              />
             )}
             {!result && busy && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -258,6 +290,105 @@ export default function ComposerPage() {
           100% { transform: translateX(200%); }
         }
       `}</style>
+    </div>
+  );
+}
+
+// ── Sing to Me ─────────────────────────────────────────────────────────────────
+
+function SingToMe({
+  card, drawing, onDraw, onUse, font,
+}: {
+  card: OracleCard | null;
+  drawing: boolean;
+  onDraw: () => void;
+  onUse: (poem: string) => void;
+  font: string;
+}) {
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    if (card) {
+      setRevealed(false);
+      const t = setTimeout(() => setRevealed(true), 40);
+      return () => clearTimeout(t);
+    }
+  }, [card]);
+
+  if (!card) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <button
+          onClick={onDraw}
+          disabled={drawing}
+          className="group relative px-12 py-8 rounded-2xl border border-border/40 hover:border-border transition-all duration-300 hover:bg-muted/20 disabled:opacity-40 disabled:cursor-default"
+        >
+          <span className="text-2xl font-semibold tracking-widest uppercase text-muted-foreground/50 group-hover:text-muted-foreground group-disabled:group-hover:text-muted-foreground/50 transition-colors">
+            {drawing ? '…' : 'Sing to me'}
+          </span>
+          <span className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-transparent via-primary/5 to-transparent pointer-events-none" />
+        </button>
+      </div>
+    );
+  }
+
+  const deckLabel = card.deck
+    ? card.deck.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    : null;
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-8 px-12 max-w-xl mx-auto">
+      {/* Card name */}
+      <div
+        className={[
+          'text-center transition-all duration-500',
+          revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2',
+        ].join(' ')}
+      >
+        {deckLabel && (
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/50 mb-1">{deckLabel}</p>
+        )}
+        <h2 className="text-xl font-semibold tracking-wide text-foreground/80">
+          {card.title}
+        </h2>
+      </div>
+
+      {/* Body */}
+      <div
+        className={[
+          'w-full transition-all duration-700 delay-150',
+          revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3',
+        ].join(' ')}
+      >
+        <pre
+          style={{ fontFamily: font, fontSize: '1rem', lineHeight: '1.9' }}
+          className="whitespace-pre-wrap text-foreground/90 text-center"
+        >
+          {card.body}
+        </pre>
+      </div>
+
+      {/* Actions */}
+      <div
+        className={[
+          'flex items-center gap-4 transition-all duration-700 delay-300',
+          revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2',
+        ].join(' ')}
+      >
+        <button
+          onClick={() => onUse(card.body)}
+          className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+        >
+          Write from here
+        </button>
+        <button
+          onClick={onDraw}
+          disabled={drawing}
+          className="px-4 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-40"
+        >
+          {drawing ? '…' : 'Draw another'}
+        </button>
+      </div>
     </div>
   );
 }
