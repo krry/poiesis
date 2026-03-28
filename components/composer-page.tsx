@@ -59,12 +59,15 @@ export default function ComposerPage() {
 
   async function drawCard() {
     setDrawing(true);
+    setError('');
     try {
       const resp = await fetch('/api/draw');
-      if (!resp.ok) throw new Error();
+      if (!resp.ok) throw new Error(`Draw failed (${resp.status})`);
       const data = await resp.json();
       const raw = data.cards?.[0];
       if (raw) setDrawnCard({ title: raw.title, body: raw.body, keywords: raw.keywords, deck: raw.deck_id ?? raw.deck, suit: raw.suit });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not reach oracle');
     } finally {
       setDrawing(false);
     }

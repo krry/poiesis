@@ -70,7 +70,11 @@ export default function PoetryEditor({ value, onChange, font, placeholder, onSub
   const [tokens, setTokens] = useState<Token[]>([]);
 
   const refresh = useCallback(async (text: string) => {
-    setTokens(await tokenize(text));
+    try {
+      setTokens(await tokenize(text));
+    } catch {
+      // NLP unavailable (e.g. offline) — colours degrade silently
+    }
   }, []);
 
   useEffect(() => {
