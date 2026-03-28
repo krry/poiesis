@@ -61,9 +61,10 @@ interface Props {
   onChange: (v: string) => void;
   font: string;
   placeholder?: string;
+  onSubmit?: () => void;
 }
 
-export default function PoetryEditor({ value, onChange, font, placeholder }: Props) {
+export default function PoetryEditor({ value, onChange, font, placeholder, onSubmit }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -124,6 +125,7 @@ export default function PoetryEditor({ value, onChange, font, placeholder }: Pro
         ref={textareaRef}
         value={value}
         onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmit?.(); } }}
         onScroll={syncScroll}
         placeholder={placeholder}
         spellCheck={false}
