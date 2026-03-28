@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import PoetryEditor from './poetry-editor';
 import type { EditorResult, Pipeline } from '@/lib/types';
@@ -55,6 +55,7 @@ export default function ComposerPage() {
   const [drawnCard, setDrawnCard] = useState<OracleCard | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [inspirationCard, setInspirationCard] = useState<OracleCard | null>(null);
+  const resultPaneRef = useRef<HTMLDivElement>(null);
 
   async function drawCard() {
     setDrawing(true);
@@ -117,12 +118,19 @@ export default function ComposerPage() {
     }
   }
 
+  // On mobile (stacked layout), scroll results into view when they arrive
+  useEffect(() => {
+    if (result) {
+      resultPaneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [result]);
+
   const pct = PIPELINE_PCT[pipeline];
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
+    <div className="flex flex-col min-h-[100dvh] bg-background md:h-screen md:overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0">
+      <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-border shrink-0">
         <span className="text-sm font-semibold tracking-widest uppercase text-muted-foreground">
           Poiesis
         </span>
@@ -141,10 +149,10 @@ export default function ComposerPage() {
         </div>
       </header>
 
-      {/* Main split */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Main — stacks on mobile, splits on desktop */}
+      <div className="flex flex-col md:flex-row flex-1 md:overflow-hidden">
         {/* Left: input */}
-        <div className="w-[44%] flex flex-col gap-4 p-6 overflow-y-auto border-r border-border">
+        <div className="flex flex-col gap-4 p-4 md:p-6 border-b md:border-b-0 md:border-r border-border md:w-[44%] md:overflow-y-auto">
           <PoetryEditor
             value={poem}
             onChange={setPoem}
@@ -198,7 +206,7 @@ export default function ComposerPage() {
             <p className="text-yellow-500/80 text-xs">{saveWarning}</p>
           )}
 
-          <div className="flex items-center gap-3 mt-auto pt-2">
+          <div className="flex items-center gap-3 pt-2">
             <button
               onClick={compose}
               disabled={busy}
@@ -216,7 +224,7 @@ export default function ComposerPage() {
               </button>
             )}
 
-            <div className="flex gap-1 ml-auto">
+            <div className="hidden md:flex gap-1 ml-auto">
               {FONTS.map(f => (
                 <button
                   key={f.id}
@@ -236,7 +244,7 @@ export default function ComposerPage() {
         </div>
 
         {/* Right: results */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div ref={resultPaneRef} className="flex flex-col flex-1 md:overflow-hidden">
           {/* Progress bar */}
           <div className="h-0.5 bg-border shrink-0 relative overflow-hidden">
             <div
@@ -248,7 +256,7 @@ export default function ComposerPage() {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 md:overflow-y-auto p-4 md:p-6">
             {!result && pipeline === 'idle' && (
               <SingToMe
                 card={drawnCard}
@@ -260,7 +268,7 @@ export default function ComposerPage() {
 
             )}
             {!result && busy && (
-              <div className="flex flex-col items-center justify-center h-full gap-4">
+              <div className="flex flex-col items-center justify-center min-h-[12rem] md:h-full gap-4">
                 <div className="flex gap-2">
                   {STEPS.map(step => (
                     <span
@@ -321,11 +329,11 @@ function SingToMe({
 
   if (!card) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center min-h-[10rem] md:h-full py-8">
         <button
           onClick={onDraw}
           disabled={drawing}
-          className="group relative px-12 py-8 rounded-2xl border border-border/40 hover:border-border transition-all duration-300 hover:bg-muted/20 disabled:opacity-40 disabled:cursor-default"
+          className="group relative px-8 py-6 md:px-12 md:py-8 rounded-2xl border border-border/40 hover:border-border transition-all duration-300 hover:bg-muted/20 disabled:opacity-40 disabled:cursor-default"
         >
           <span className="text-2xl font-semibold tracking-widest uppercase text-muted-foreground/50 group-hover:text-muted-foreground group-disabled:group-hover:text-muted-foreground/50 transition-colors">
             {drawing ? '…' : 'Sing to me'}
@@ -341,7 +349,7 @@ function SingToMe({
     : null;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-8 px-12 max-w-xl mx-auto">
+    <div className="flex flex-col items-center justify-center min-h-[16rem] md:h-full gap-8 px-4 md:px-12 max-w-xl mx-auto py-8">
       {/* Card name */}
       <div
         className={[
@@ -442,7 +450,7 @@ function IntegratedView({ result, font, inspirationCard }: { result: EditorResul
     window.speechSynthesis?.cancel();
   }, []);
 
-  const stanzas = useMemo(() => parseStanzas(result.polished), [result.polished]);
+  const stanzas = useMemo(() => parseStanzas(result.polished ?? ''), [result.polished]);
 
   // ── Suno export ───────────────────────────────────────────────────────────
   const [sunoState, setSunoState] = useState<
@@ -542,22 +550,24 @@ function IntegratedView({ result, font, inspirationCard }: { result: EditorResul
         const stanzaEnd = stanza.startLine + stanza.lines.length - 1;
 
         // Midjourney prompt whose line range starts in this stanza
-        const mjp = result.midjourney_prompts.find(
+        const mjPrompts = result.midjourney_prompts ?? [];
+        const mjp = mjPrompts.find(
           p => p.lines[0] >= stanza.startLine && p.lines[0] <= stanzaEnd,
         );
 
         // All narration entries that start in this stanza
-        const narLines = result.narration_script.filter(
+        const narScript = result.narration_script ?? [];
+        const narLines = narScript.filter(
           n => n.lines[0] >= stanza.startLine && n.lines[0] <= stanzaEnd,
         );
         // Combined text for TTS; index in the full array for play-state tracking
         const narText = narLines.map(n => n.text).join(' ');
         const narIdx  = narLines.length
-          ? result.narration_script.indexOf(narLines[0])
+          ? narScript.indexOf(narLines[0])
           : -1;
 
         // Annotations that overlap with this stanza's line range
-        const anns = result.annotations.filter(
+        const anns = (result.annotations ?? []).filter(
           a => a.lines[0] <= stanzaEnd && a.lines[1] >= stanza.startLine,
         );
 

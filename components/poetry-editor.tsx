@@ -90,11 +90,11 @@ export default function PoetryEditor({ value, onChange, font, placeholder, onSub
     fontSize: '1.05rem',
     lineHeight: '1.9',
     letterSpacing: '0.01em',
-    padding: '1.25rem 1.5rem',
+    padding: '0.875rem 1rem',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
     overflowWrap: 'break-word',
-    minHeight: '16rem',
+    minHeight: '10rem',
   };
 
   return (

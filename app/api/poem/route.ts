@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    return NextResponse.json({ raw }, { status: 200 });
+    return NextResponse.json({ error: 'LLM returned unparseable response', raw }, { status: 422 });
   }
 
   return NextResponse.json(parsed);
