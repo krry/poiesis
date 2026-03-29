@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EDITOR_SYSTEM_PROMPT, buildEditorUserMessage } from '@/lib/editor-prompt';
 
+// Allow up to 30s for the serverless function
+export const maxDuration = 30;
+
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
 // openrouter/free auto-routes to whichever free model has capacity — $0 cost
@@ -9,6 +12,7 @@ const TEXT_MODEL = process.env.MODEL || 'openrouter/free';
 async function callLLM(system: string, user: string): Promise<string> {
   const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
+    signal: AbortSignal.timeout(25_000), // bail if OpenRouter stalls
     headers: {
       Authorization: `Bearer ${OPENROUTER_KEY}`,
       'HTTP-Referer': 'https://poiesis.kerry.ink',

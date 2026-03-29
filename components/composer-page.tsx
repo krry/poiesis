@@ -93,6 +93,7 @@ export default function ComposerPage() {
       // 1. Editor
       const editResp = await fetch('/api/poem', {
         method: 'POST',
+        signal: AbortSignal.timeout(32_000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ poem, styleHints, imageHints, audioHints }),
       });
