@@ -1,41 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { generateText } from 'ai';
+import { gateway } from '@ai-sdk/gateway';
 import { EDITOR_SYSTEM_PROMPT, buildEditorUserMessage } from '@/lib/editor-prompt';
 
 // Allow up to 30s for the serverless function
 export const maxDuration = 30;
 
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
-
-// openrouter/free auto-routes to whichever free model has capacity — $0 cost
-const TEXT_MODEL = process.env.MODEL || 'openrouter/free';
-
-async function callLLM(system: string, user: string): Promise<string> {
-  const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    signal: AbortSignal.timeout(25_000), // bail if OpenRouter stalls
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_KEY}`,
-      'HTTP-Referer': 'https://poiesis.kerry.ink',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: TEXT_MODEL,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-    }),
-  });
-  if (!resp.ok) throw new Error(`OpenRouter ${resp.status}: ${await resp.text()}`);
-  const data = await resp.json();
-  return data.choices?.[0]?.message?.content ?? '';
-}
+const MODEL = process.env.POEM_MODEL || 'groq/llama-3.1-8b-instant';
 
 export async function POST(req: NextRequest) {
-  if (!OPENROUTER_KEY) {
-    return NextResponse.json({ error: 'No LLM API key configured' }, { status: 500 });
-  }
-
   const { poem, styleHints, imageHints, audioHints } = await req.json();
   if (!poem?.trim()) {
     return NextResponse.json({ error: 'poem is required' }, { status: 400 });
@@ -46,7 +19,20 @@ export async function POST(req: NextRequest) {
 
   const userMessage = buildEditorUserMessage(poem, styleHints, imageHints, audioHints);
 
-  const raw = await callLLM(EDITOR_SYSTEM_PROMPT, userMessage);
+  let raw: string;
+  try {
+    const result = await generateText({
+      model: gateway(MODEL),
+      system: EDITOR_SYSTEM_PROMPT,
+      prompt: userMessage,
+      abortSignal: AbortSignal.timeout(25_000),
+    });
+    raw = result.text;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: `LLM error: ${msg}` }, { status: 502 });
+  }
+
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
   let parsed: unknown;
