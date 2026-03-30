@@ -14,7 +14,6 @@ const TAG_TO_CLASS: [string, string][] = [
   ['Determiner',  'pos-det'],
 ];
 
-// compromise returns tags as string[] in recent versions
 function posClass(tags: string[] | Record<string, boolean>): string {
   const has = Array.isArray(tags)
     ? (t: string) => tags.includes(t)
@@ -50,9 +49,9 @@ async function tokenize(text: string): Promise<Token[]> {
 }
 
 const FONT_VARS: Record<string, string> = {
-  inconsolata: 'var(--font-inconsolata)',
+  inconsolata:  'var(--font-inconsolata)',
   'fira-code':  'var(--font-fira-code)',
-  recursive:   'var(--font-recursive)',
+  recursive:    'var(--font-recursive)',
   'geist-mono': 'var(--font-geist-mono)',
 };
 
@@ -62,9 +61,11 @@ interface Props {
   font: string;
   placeholder?: string;
   onSubmit?: () => void;
+  /** Pass 'h-full' to make the editor fill its flex-1 container */
+  className?: string;
 }
 
-export default function PoetryEditor({ value, onChange, font, placeholder, onSubmit }: Props) {
+export default function PoetryEditor({ value, onChange, font, placeholder, onSubmit, className = '' }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -73,7 +74,7 @@ export default function PoetryEditor({ value, onChange, font, placeholder, onSub
     try {
       setTokens(await tokenize(text));
     } catch {
-      // NLP unavailable (e.g. offline) — colours degrade silently
+      // NLP unavailable — colours degrade silently
     }
   }, []);
 
@@ -98,12 +99,14 @@ export default function PoetryEditor({ value, onChange, font, placeholder, onSub
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
     overflowWrap: 'break-word',
-    minHeight: '10rem',
+    // fills container height when parent is flex-1; minHeight is the stanza floor (~6 lines)
+    height: '100%',
+    minHeight: '13rem',
   };
 
   return (
-    <div className="relative w-full">
-      {/* POS-highlighted backdrop — rendered as safe React elements, no innerHTML */}
+    <div className={`relative w-full ${className}`}>
+      {/* POS-highlighted backdrop */}
       <div
         ref={backdropRef}
         aria-hidden="true"
