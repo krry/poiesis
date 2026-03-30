@@ -42,6 +42,22 @@ const PIPELINE_PCT: Record<Pipeline, number> = {
   idle: 0, editing: 30, illustrating: 70, narrating: 85, done: 100, error: 100,
 };
 
+// localStorage keys
+const SK = {
+  poem:       'poiesis:poem',
+  style:      'poiesis:styleHints',
+  image:      'poiesis:imageHints',
+  audio:      'poiesis:audioHints',
+  font:       'poiesis:font',
+} as const;
+
+function ls(key: string): string {
+  try { return localStorage.getItem(key) ?? ''; } catch { return ''; }
+}
+function lsSet(key: string, val: string) {
+  try { localStorage.setItem(key, val); } catch { /* quota/private browsing */ }
+}
+
 export default function ComposerPage() {
   const router = useRouter();
 
@@ -50,6 +66,7 @@ export default function ComposerPage() {
   const [imageHints, setImage]    = useState('');
   const [audioHints, setAudio]    = useState('');
   const [font, setFont]           = useState('inconsolata');
+  const [hydrated, setHydrated]   = useState(false);
   const [pipeline, setPipeline]   = useState<Pipeline>('idle');
   const [result, setResult]       = useState<EditorResult | null>(null);
   const [error, setError]         = useState('');
@@ -60,6 +77,30 @@ export default function ComposerPage() {
   const [drawing, setDrawing] = useState(false);
   const [inspirationCard, setInspirationCard] = useState<OracleCard | null>(null);
   const resultPaneRef = useRef<HTMLDivElement>(null);
+
+  // Hydrate from localStorage once on mount
+  useEffect(() => {
+    setPoem(ls(SK.poem));
+    setStyle(ls(SK.style));
+    setImage(ls(SK.image));
+    setAudio(ls(SK.audio));
+    const savedFont = ls(SK.font);
+    if (savedFont) setFont(savedFont);
+    setHydrated(true);
+  }, []);
+
+  // Persisting field setters
+  function updatePoem(v: string)  { setPoem(v);  lsSet(SK.poem,  v); }
+  function updateStyle(v: string) { setStyle(v); lsSet(SK.style, v); }
+  function updateImage(v: string) { setImage(v); lsSet(SK.image, v); }
+  function updateAudio(v: string) { setAudio(v); lsSet(SK.audio, v); }
+  function updateFont(v: string)  { setFont(v);  lsSet(SK.font,  v); }
+
+  function clearAll() {
+    updatePoem(''); updateStyle(''); updateImage(''); updateAudio('');
+    setResult(null); setSessionId(null); setError(''); setSaveWarning('');
+    setPipeline('idle'); setDrawnCard(null); setInspirationCard(null);
+  }
 
   async function drawCard() {
     setDrawing(true);
@@ -81,14 +122,14 @@ export default function ComposerPage() {
     if (surpriseMode === 'tarot') {
       const written = TAROT.filter(c => c.poem);
       const card = written[Math.floor(Math.random() * written.length)];
-      setPoem(card.poem!);
+      updatePoem(card.poem!);
     } else {
-      setPoem(randomClassic().text);
+      updatePoem(randomClassic().text);
     }
   }
 
   function useCard(card: OracleCard) {
-    setPoem(card.body);
+    updatePoem(card.body);
     setInspirationCard(card);
     setDrawnCard(null);
   }
@@ -149,9 +190,19 @@ export default function ComposerPage() {
     <div className="flex flex-col min-h-[100dvh] bg-background md:h-screen md:overflow-hidden">
       {/* Header */}
       <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-border shrink-0">
-        <span className="text-sm font-semibold tracking-widest uppercase text-muted-foreground">
-          Poiesis
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold tracking-widest uppercase text-muted-foreground">
+            Poiesis
+          </span>
+          {hydrated && (poem || styleHints || imageHints || audioHints) && !busy && (
+            <button
+              onClick={clearAll}
+              className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              New
+            </button>
+          )}
+        </div>
 
         {/* Pipeline status */}
         <div className="flex items-center gap-1.5">
@@ -174,7 +225,7 @@ export default function ComposerPage() {
           <div className="relative w-full">
             <PoetryEditor
               value={poem}
-              onChange={setPoem}
+              onChange={updatePoem}
               onSubmit={compose}
               font={font}
               placeholder={"One need not be a Chamber — to be Haunted —\nOne need not be a House —\nThe Brain has Corridors — surpassing\nMaterial Place —\nFar safer, of a Midnight — meeting\nExternal Ghost —\nThan an Interior — confronting —\nThat Cooler Host —\nFar safer, through an Abbey — gallop —\nThe Stones a'chase —\nThan Moonless — One's A'self encounter —\nIn lonesome Place —\nOurself — behind Ourself — Concealed —\nShould startle — most —\nAssassin — hid in Our Apartment —\nBe Horror's least —\nThe Prudent — carries a Revolver —\nHe bolts the Door —\nO'erlooking a Superior Spectre —\nMore near —"}
@@ -207,7 +258,7 @@ export default function ComposerPage() {
                 <span className="text-xs text-muted-foreground uppercase tracking-wider">Style inspirations</span>
                 <textarea
                   value={styleHints}
-                  onChange={e => setStyle(e.target.value)}
+                  onChange={e => updateStyle(e.target.value)}
                   rows={2}
                   placeholder="e.g. Lucille Clifton, late Neruda, wabi-sabi…"
                   className="text-sm bg-muted/30 border border-border rounded-md p-2 resize-none outline-none focus:border-ring"
@@ -217,7 +268,7 @@ export default function ComposerPage() {
                 <span className="text-xs text-muted-foreground uppercase tracking-wider">Image mood</span>
                 <textarea
                   value={imageHints}
-                  onChange={e => setImage(e.target.value)}
+                  onChange={e => updateImage(e.target.value)}
                   rows={2}
                   placeholder="e.g. cold neon city, wet pavement, sodium haze…"
                   className="text-sm bg-muted/30 border border-border rounded-md p-2 resize-none outline-none focus:border-ring"
@@ -227,7 +278,7 @@ export default function ComposerPage() {
                 <span className="text-xs text-muted-foreground uppercase tracking-wider">Voice mood</span>
                 <textarea
                   value={audioHints}
-                  onChange={e => setAudio(e.target.value)}
+                  onChange={e => updateAudio(e.target.value)}
                   rows={2}
                   placeholder="e.g. low, intimate, slow with long silences…"
                   className="text-sm bg-muted/30 border border-border rounded-md p-2 resize-none outline-none focus:border-ring"
@@ -252,11 +303,12 @@ export default function ComposerPage() {
               {busy ? `${STEP_LABELS[pipeline]}…` : 'Compose'}
             </button>
 
+
             <div className="hidden md:flex gap-1 ml-auto">
               {FONTS.map(f => (
                 <button
                   key={f.id}
-                  onClick={() => setFont(f.id)}
+                  onClick={() => updateFont(f.id)}
                   className={[
                     'px-2.5 py-1 text-xs rounded-md transition-colors',
                     font === f.id
