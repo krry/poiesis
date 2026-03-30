@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PoetryEditor from './poetry-editor';
 import type { EditorResult, Pipeline } from '@/lib/types';
@@ -252,15 +252,6 @@ export default function ComposerPage() {
               {busy ? `${STEP_LABELS[pipeline]}…` : 'Compose'}
             </button>
 
-            {sessionId && (
-              <button
-                onClick={() => router.push(`/read/${sessionId}`)}
-                className="px-4 py-2 rounded-full border border-border text-sm hover:bg-muted/50 transition-colors flex items-center gap-1.5"
-              >
-                ▶ Play
-              </button>
-            )}
-
             <div className="hidden md:flex gap-1 ml-auto">
               {FONTS.map(f => (
                 <button
@@ -330,6 +321,18 @@ export default function ComposerPage() {
               <IntegratedView result={result} font={font} inspirationCard={inspirationCard} />
             )}
           </div>
+
+          {/* Play — anchored CTA at bottom of results pane */}
+          {sessionId && (
+            <div className="shrink-0 p-4 md:p-6 border-t border-border">
+              <button
+                onClick={() => router.push(`/read/${sessionId}`)}
+                className="w-full py-3 rounded-full bg-primary text-primary-foreground text-base font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              >
+                ▶ Play
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -341,6 +344,19 @@ export default function ComposerPage() {
       `}</style>
     </div>
   );
+}
+
+// ── Braille spinner ────────────────────────────────────────────────────────────
+
+const BRAILLE = ['⣾','⣽','⣻','⢿','⡿','⣟','⣯','⣷'];
+
+function BrailleSpinner({ className = '' }: { className?: string }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI(n => (n + 1) % BRAILLE.length), 100);
+    return () => clearInterval(t);
+  }, []);
+  return <span className={className} aria-hidden>{BRAILLE[i]}</span>;
 }
 
 // ── Sing to Me ─────────────────────────────────────────────────────────────────
@@ -619,7 +635,7 @@ function IntegratedView({ result, font, inspirationCard }: { result: EditorResul
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={img.url} alt="" className="w-full h-full object-cover" />
                 ) : img?.loading ? (
-                  <span className="text-muted-foreground/40 text-xs animate-pulse">…</span>
+                  <BrailleSpinner className="text-muted-foreground/50 text-base font-mono" />
                 ) : mjp ? (
                   <button
                     onClick={() => generateImage(mjp.stanza, mjp.prompt)}
