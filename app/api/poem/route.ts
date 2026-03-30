@@ -33,7 +33,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `LLM error: ${msg}` }, { status: 502 });
   }
 
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  // Extract JSON object — tolerate markdown fences and surrounding prose from the model
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  const cleaned = jsonMatch ? jsonMatch[0] : raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
   let parsed: unknown;
   try {
