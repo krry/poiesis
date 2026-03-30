@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import PoetryEditor from './poetry-editor';
 import type { EditorResult, Pipeline } from '@/lib/types';
 import { Gift } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { TAROT } from '@/lib/tarot';
 import { randomClassic } from '@/lib/poem-library';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -24,15 +23,27 @@ const FONT_VARS: Record<string, string> = {
   'geist-mono': 'var(--font-geist-mono)',
 };
 
-const STEPS: Pipeline[] = ['editing', 'illustrating', 'done'];
-const STEP_LABELS: Record<Pipeline, string> = {
-  idle: 'idle', editing: 'Editor', illustrating: 'Illustrator',
-  narrating: 'Narrator', done: 'Done', error: 'Error',
+// ── Flow steps (words → look → feel → sound → magic) ─────────────────────────
+
+const FLOW_STEPS = ['words', 'look', 'feel', 'sound', 'magic'] as const;
+type FlowStep = typeof FLOW_STEPS[number];
+
+const PIPELINE_TO_FLOW: Record<Pipeline, FlowStep | null> = {
+  idle: null, editing: 'words', illustrating: 'look',
+  narrating: 'sound', done: 'magic', error: null,
+};
+
+// keep legacy labels for the loading indicator text
+const PIPELINE_LABEL: Record<Pipeline, string> = {
+  idle: '', editing: 'words', illustrating: 'look',
+  narrating: 'sound', done: 'magic', error: 'error',
 };
 
 const PIPELINE_PCT: Record<Pipeline, number> = {
   idle: 0, editing: 30, illustrating: 70, narrating: 85, done: 100, error: 100,
 };
+
+interface Suggestions { style: string; image: string; voice: string; }
 
 // localStorage keys
 const SK = {
@@ -63,6 +74,44 @@ function BrailleSpinner({ className = '' }: { className?: string }) {
   return <span className={className} aria-hidden>{BRAILLE[i]}</span>;
 }
 
+// ── HintField ─────────────────────────────────────────────────────────────────
+
+interface HintFieldProps {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  suggestion: string | null;
+}
+
+function HintField({ label, value, onChange, placeholder, suggestion }: HintFieldProps) {
+  function applySuggestion() {
+    const sep = value.trim() ? ', ' : '';
+    onChange(value.trim() + sep + suggestion);
+  }
+
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground uppercase tracking-wider">{label}</span>
+      <textarea
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        rows={2}
+        placeholder={placeholder}
+        className="text-sm bg-muted/30 border border-border rounded-md p-2 resize-none outline-none focus:border-ring"
+      />
+      {suggestion && (
+        <button
+          onClick={applySuggestion}
+          className="self-start text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors italic"
+        >
+          ✦ {suggestion}
+        </button>
+      )}
+    </label>
+  );
+}
+
 // ── Composer ───────────────────────────────────────────────────────────────────
 
 export default function ComposerPage() {
@@ -80,6 +129,9 @@ export default function ComposerPage() {
   const [saveWarning, setSaveWarning] = useState('');
   const [sessionId, setSessionId]     = useState<string | null>(null);
   const [surpriseMode, setSurpriseMode] = useState<'tarot' | 'classics'>('tarot');
+  const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resultPaneRef = useRef<HTMLDivElement>(null);
 
   // Hydrate from localStorage once on mount
@@ -92,6 +144,32 @@ export default function ComposerPage() {
     if (savedFont) setFont(savedFont);
     setHydrated(true);
   }, []);
+
+  const fetchSuggestions = useCallback(async (text: string) => {
+    if (!text.trim() || text.trim().length < 20) return;
+    setSuggesting(true);
+    try {
+      const resp = await fetch('/api/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poem: text }),
+        signal: AbortSignal.timeout(14_000),
+      });
+      if (resp.ok) setSuggestions(await resp.json());
+    } catch {
+      // suggestions are best-effort — silent failure
+    } finally {
+      setSuggesting(false);
+    }
+  }, []);
+
+  // Idle-timer: suggest 3s after typing stops (only if poem changed and hints are sparse)
+  useEffect(() => {
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    if (!poem.trim() || poem.trim().length < 20) return;
+    suggestTimer.current = setTimeout(() => fetchSuggestions(poem), 3000);
+    return () => { if (suggestTimer.current) clearTimeout(suggestTimer.current); };
+  }, [poem, fetchSuggestions]);
 
   // Persisting setters
   function updatePoem(v: string)  { setPoem(v);  lsSet(SK.poem,  v); }
@@ -107,6 +185,7 @@ export default function ComposerPage() {
   }
 
   function surprise() {
+    setSuggestions(null);
     if (surpriseMode === 'tarot') {
       const written = TAROT.filter(c => c.poem);
       const card = written[Math.floor(Math.random() * written.length)];
@@ -114,6 +193,11 @@ export default function ComposerPage() {
     } else {
       updatePoem(randomClassic().text);
     }
+  }
+
+  function handleEditorBlur() {
+    if (suggestTimer.current) { clearTimeout(suggestTimer.current); suggestTimer.current = null; }
+    fetchSuggestions(poem);
   }
 
   const busy = pipeline !== 'idle' && pipeline !== 'done' && pipeline !== 'error';
@@ -189,16 +273,31 @@ export default function ComposerPage() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <div className="flex items-center gap-1.5">
-            {STEPS.map(step => (
-              <Badge
-                key={step}
-                variant={pipeline === step ? 'default' : pipeline === 'done' || STEPS.indexOf(step) < STEPS.indexOf(pipeline) ? 'secondary' : 'outline'}
-                className="text-xs"
-              >
-                {STEP_LABELS[step]}
-              </Badge>
-            ))}
+          {/* Flow steps: words → look → feel → sound → magic */}
+          <div className="flex items-center gap-0.5 text-[11px] font-mono">
+            {FLOW_STEPS.map((step, i) => {
+              const activeStep = PIPELINE_TO_FLOW[pipeline];
+              const activeIdx  = activeStep ? FLOW_STEPS.indexOf(activeStep) : -1;
+              const stepIdx    = i;
+              const isActive   = step === activeStep;
+              const isPast     = activeIdx >= 0 && stepIdx < activeIdx;
+              return (
+                <span key={step} className="flex items-center gap-0.5">
+                  <span className={[
+                    'px-1.5 py-0.5 rounded transition-colors',
+                    isActive  ? 'text-foreground bg-primary/20 font-semibold' :
+                    isPast    ? 'text-muted-foreground/60' :
+                    pipeline === 'idle' ? 'text-muted-foreground/30' :
+                    'text-muted-foreground/20',
+                  ].join(' ')}>
+                    {step}
+                  </span>
+                  {i < FLOW_STEPS.length - 1 && (
+                    <span className="text-muted-foreground/20">→</span>
+                  )}
+                </span>
+              );
+            })}
           </div>
         </div>
       </header>
@@ -218,6 +317,7 @@ export default function ComposerPage() {
                 value={poem}
                 onChange={updatePoem}
                 onSubmit={compose}
+                onBlur={handleEditorBlur}
                 font={font}
                 className="h-full"
                 placeholder={"One need not be a Chamber — to be Haunted —\nOne need not be a House —\nThe Brain has Corridors — surpassing\nMaterial Place —\nFar safer, of a Midnight — meeting\nExternal Ghost —\nThan an Interior — confronting —\nThat Cooler Host —\nFar safer, through an Abbey — gallop —\nThe Stones a'chase —\nThan Moonless — One's A'self encounter —\nIn lonesome Place —\nOurself — behind Ourself — Concealed —\nShould startle — most —\nAssassin — hid in Our Apartment —\nBe Horror's least —\nThe Prudent — carries a Revolver —\nHe bolts the Door —\nO'erlooking a Superior Spectre —\nMore near —"}
@@ -257,40 +357,32 @@ export default function ComposerPage() {
 
             {/* Hints */}
             <details className="group shrink-0">
-              <summary className="text-xs uppercase tracking-widest text-muted-foreground cursor-pointer select-none py-1">
-                Hints &amp; inspirations
+              <summary className="text-xs uppercase tracking-widest text-muted-foreground cursor-pointer select-none py-1 flex items-center gap-2">
+                <span>Hints &amp; inspirations</span>
+                {suggesting && <BrailleSpinner className="text-muted-foreground/40 font-mono text-sm" />}
               </summary>
               <div className="mt-3 flex flex-col gap-3">
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Style inspirations</span>
-                  <textarea
-                    value={styleHints}
-                    onChange={e => updateStyle(e.target.value)}
-                    rows={2}
-                    placeholder="e.g. Lucille Clifton, late Neruda, wabi-sabi…"
-                    className="text-sm bg-muted/30 border border-border rounded-md p-2 resize-none outline-none focus:border-ring"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Image mood</span>
-                  <textarea
-                    value={imageHints}
-                    onChange={e => updateImage(e.target.value)}
-                    rows={2}
-                    placeholder="e.g. cold neon city, wet pavement, sodium haze…"
-                    className="text-sm bg-muted/30 border border-border rounded-md p-2 resize-none outline-none focus:border-ring"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Voice mood</span>
-                  <textarea
-                    value={audioHints}
-                    onChange={e => updateAudio(e.target.value)}
-                    rows={2}
-                    placeholder="e.g. low, intimate, slow with long silences…"
-                    className="text-sm bg-muted/30 border border-border rounded-md p-2 resize-none outline-none focus:border-ring"
-                  />
-                </label>
+                <HintField
+                  label="Style inspirations"
+                  value={styleHints}
+                  onChange={updateStyle}
+                  placeholder="e.g. Lucille Clifton, late Neruda, wabi-sabi…"
+                  suggestion={suggestions?.style ?? null}
+                />
+                <HintField
+                  label="Image mood"
+                  value={imageHints}
+                  onChange={updateImage}
+                  placeholder="e.g. cold neon city, wet pavement, sodium haze…"
+                  suggestion={suggestions?.image ?? null}
+                />
+                <HintField
+                  label="Voice mood"
+                  value={audioHints}
+                  onChange={updateAudio}
+                  placeholder="e.g. low, intimate, slow with long silences…"
+                  suggestion={suggestions?.voice ?? null}
+                />
               </div>
             </details>
 
@@ -305,7 +397,7 @@ export default function ComposerPage() {
               disabled={busy}
               className="w-full py-3 rounded-full bg-primary text-primary-foreground text-base font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity"
             >
-              {busy ? `${STEP_LABELS[pipeline]}…` : 'Compose'}
+              {busy ? `${PIPELINE_LABEL[pipeline]}…` : 'Compose'}
             </button>
           </div>
         </div>
@@ -333,22 +425,25 @@ export default function ComposerPage() {
             )}
             {!result && busy && (
               <div className="flex flex-col items-center justify-center min-h-[12rem] md:h-full gap-4">
-                <div className="flex gap-2">
-                  {STEPS.map(step => (
-                    <span
-                      key={step}
-                      className={[
-                        'text-xs uppercase tracking-widest',
-                        pipeline === step
-                          ? 'text-foreground animate-pulse'
-                          : STEPS.indexOf(step) < STEPS.indexOf(pipeline)
-                            ? 'text-muted-foreground/50'
-                            : 'text-muted-foreground/20',
-                      ].join(' ')}
-                    >
-                      {STEP_LABELS[step]}
-                    </span>
-                  ))}
+                <div className="flex items-center gap-0.5 text-[11px] font-mono">
+                  {FLOW_STEPS.map((step, i) => {
+                    const activeStep = PIPELINE_TO_FLOW[pipeline];
+                    const activeIdx  = activeStep ? FLOW_STEPS.indexOf(activeStep) : -1;
+                    const isActive   = step === activeStep;
+                    const isPast     = activeIdx >= 0 && i < activeIdx;
+                    return (
+                      <span key={step} className="flex items-center gap-0.5">
+                        <span className={[
+                          isActive ? 'text-foreground animate-pulse' :
+                          isPast   ? 'text-muted-foreground/50' :
+                                     'text-muted-foreground/20',
+                        ].join(' ')}>
+                          {step}
+                        </span>
+                        {i < FLOW_STEPS.length - 1 && <span className="text-muted-foreground/20">→</span>}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}

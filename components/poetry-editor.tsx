@@ -61,11 +61,12 @@ interface Props {
   font: string;
   placeholder?: string;
   onSubmit?: () => void;
+  onBlur?: () => void;
   /** Pass 'h-full' to make the editor fill its flex-1 container */
   className?: string;
 }
 
-export default function PoetryEditor({ value, onChange, font, placeholder, onSubmit, className = '' }: Props) {
+export default function PoetryEditor({ value, onChange, font, placeholder, onSubmit, onBlur, className = '' }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -133,6 +134,7 @@ export default function PoetryEditor({ value, onChange, font, placeholder, onSub
         value={value}
         onChange={e => onChange(e.target.value)}
         onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmit?.(); } }}
+        onBlur={onBlur}
         onScroll={syncScroll}
         placeholder={placeholder}
         spellCheck={false}
