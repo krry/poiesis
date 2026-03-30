@@ -8,6 +8,7 @@ import { Gift } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TAROT } from '@/lib/tarot';
 import { randomClassic } from '@/lib/poem-library';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface OracleCard {
   title: string;
@@ -196,7 +197,11 @@ export default function ComposerPage() {
           </span>
           {hydrated && (poem || styleHints || imageHints || audioHints) && !busy && (
             <button
-              onClick={clearAll}
+              onClick={() => {
+                const dirty = poem && !result;
+                if (dirty && !confirm('Clear everything and start fresh?')) return;
+                clearAll();
+              }}
               className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
             >
               New
@@ -204,7 +209,9 @@ export default function ComposerPage() {
           )}
         </div>
 
-        {/* Pipeline status */}
+        {/* Pipeline status + theme */}
+        <div className="flex items-center gap-2">
+        <ThemeToggle />
         <div className="flex items-center gap-1.5">
           {STEPS.map(step => (
             <Badge
@@ -215,6 +222,7 @@ export default function ComposerPage() {
               {STEP_LABELS[step]}
             </Badge>
           ))}
+        </div>
         </div>
       </header>
 

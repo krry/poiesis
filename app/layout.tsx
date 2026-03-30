@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: 'Poiesis' },
 };
 
+// Hardcoded literal — no user input, not an XSS risk.
+const themeScript = `(function(){try{var t=localStorage.getItem('poiesis:theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.classList.toggle('dark',t==='dark')}catch(e){}})()`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -27,9 +30,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={[
         geist.variable, geistMono.variable,
         inconsolata.variable, firaCode.variable, recursive.variable,
-        "h-full antialiased dark",
+        "h-full antialiased",
       ].join(" ")}
     >
+      <head>
+        {/* Apply theme before first paint — prevents flash of wrong theme */}
+        {/* eslint-disable-next-line @next/next/no-before-interactive-script-outside-document */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
       </body>
