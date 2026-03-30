@@ -4,7 +4,10 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import PoetryEditor from './poetry-editor';
 import type { EditorResult, Pipeline } from '@/lib/types';
+import { Gift } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { TAROT } from '@/lib/tarot';
+import { randomClassic } from '@/lib/poem-library';
 
 interface OracleCard {
   title: string;
@@ -52,6 +55,7 @@ export default function ComposerPage() {
   const [error, setError]         = useState('');
   const [saveWarning, setSaveWarning] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [surpriseMode, setSurpriseMode] = useState<'tarot' | 'classics'>('tarot');
   const [drawnCard, setDrawnCard] = useState<OracleCard | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [inspirationCard, setInspirationCard] = useState<OracleCard | null>(null);
@@ -70,6 +74,16 @@ export default function ComposerPage() {
       setError(e instanceof Error ? e.message : 'Could not reach oracle');
     } finally {
       setDrawing(false);
+    }
+  }
+
+  function surprise() {
+    if (surpriseMode === 'tarot') {
+      const written = TAROT.filter(c => c.poem);
+      const card = written[Math.floor(Math.random() * written.length)];
+      setPoem(card.poem!);
+    } else {
+      setPoem(randomClassic().text);
     }
   }
 
@@ -157,13 +171,32 @@ export default function ComposerPage() {
       <div className="flex flex-col md:flex-row flex-1 md:overflow-hidden">
         {/* Left: input */}
         <div className="flex flex-col gap-4 p-4 md:p-6 border-b md:border-b-0 md:border-r border-border md:w-[44%] md:overflow-y-auto">
-          <PoetryEditor
-            value={poem}
-            onChange={setPoem}
-            onSubmit={compose}
-            font={font}
-            placeholder={"One need not be a Chamber — to be Haunted —\nOne need not be a House —\nThe Brain has Corridors — surpassing\nMaterial Place —\nFar safer, of a Midnight — meeting\nExternal Ghost —\nThan an Interior — confronting —\nThat Cooler Host —\nFar safer, through an Abbey — gallop —\nThe Stones a'chase —\nThan Moonless — One's A'self encounter —\nIn lonesome Place —\nOurself — behind Ourself — Concealed —\nShould startle — most —\nAssassin — hid in Our Apartment —\nBe Horror's least —\nThe Prudent — carries a Revolver —\nHe bolts the Door —\nO'erlooking a Superior Spectre —\nMore near —"}
-          />
+          <div className="relative w-full">
+            <PoetryEditor
+              value={poem}
+              onChange={setPoem}
+              onSubmit={compose}
+              font={font}
+              placeholder={"One need not be a Chamber — to be Haunted —\nOne need not be a House —\nThe Brain has Corridors — surpassing\nMaterial Place —\nFar safer, of a Midnight — meeting\nExternal Ghost —\nThan an Interior — confronting —\nThat Cooler Host —\nFar safer, through an Abbey — gallop —\nThe Stones a'chase —\nThan Moonless — One's A'self encounter —\nIn lonesome Place —\nOurself — behind Ourself — Concealed —\nShould startle — most —\nAssassin — hid in Our Apartment —\nBe Horror's least —\nThe Prudent — carries a Revolver —\nHe bolts the Door —\nO'erlooking a Superior Spectre —\nMore near —"}
+            />
+            <div className="absolute top-2 right-2 flex items-center gap-1">
+              <button
+                onClick={() => setSurpriseMode(m => m === 'tarot' ? 'classics' : 'tarot')}
+                className="px-1.5 py-0.5 text-[10px] rounded text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                title={surpriseMode === 'tarot' ? 'Switch to classics' : 'Switch to tarot'}
+              >
+                {surpriseMode === 'tarot' ? '🎴' : '📜'}
+              </button>
+              <button
+                onClick={surprise}
+                title="Surprise me"
+                aria-label="Surprise me with a poem"
+                className="p-1.5 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50 transition-colors"
+              >
+                <Gift size={14} />
+              </button>
+            </div>
+          </div>
 
           <details className="group">
             <summary className="text-xs uppercase tracking-widest text-muted-foreground cursor-pointer select-none py-1">
