@@ -16,6 +16,8 @@ const recursive  = Recursive({ variable: "--font-recursive", subsets: ["latin"] 
 export const metadata: Metadata = {
   title: "Poiesis — Bring your verses to life",
   description: "Polish your poem. Illustrate it. Narrate it. Present it.",
+  icons: { apple: '/apple-touch-icon.png' },
+  appleWebApp: { capable: true, title: 'Poiesis' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
