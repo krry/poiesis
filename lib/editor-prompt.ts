@@ -37,6 +37,7 @@ Rules:
 - Use audio_hints to bias delivery cues (tempo, intensity, timbre).
 - The polished poem must be complete — not a diff, not excerpts.
 - Always return valid JSON parseable by a strict JSON parser.
+- In string values, escape newlines as \\n — never use literal line breaks inside a string.
 `.trim();
 
 export function buildEditorUserMessage(

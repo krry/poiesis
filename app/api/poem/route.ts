@@ -6,6 +6,22 @@ import { EDITOR_SYSTEM_PROMPT, buildEditorUserMessage } from '@/lib/editor-promp
 // Allow up to 30s for the serverless function
 export const maxDuration = 30;
 
+// Escape bare \n/\r inside JSON string values (LLMs often emit these literally)
+function fixJsonStringNewlines(s: string): string {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (const c of s) {
+    if (escaped)          { out += c; escaped = false; continue; }
+    if (c === '\\' && inString) { out += c; escaped = true; continue; }
+    if (c === '"')        { out += c; inString = !inString; continue; }
+    if (inString && c === '\n') { out += '\\n'; continue; }
+    if (inString && c === '\r') { out += '\\r'; continue; }
+    out += c;
+  }
+  return out;
+}
+
 const MODEL = process.env.POEM_MODEL || 'groq/llama-3.1-8b-instant';
 
 export async function POST(req: NextRequest) {
@@ -41,7 +57,12 @@ export async function POST(req: NextRequest) {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    return NextResponse.json({ error: 'LLM returned unparseable response', raw }, { status: 422 });
+    // LLMs sometimes emit literal newlines inside string values — sanitize and retry
+    try {
+      parsed = JSON.parse(fixJsonStringNewlines(cleaned));
+    } catch {
+      return NextResponse.json({ error: 'Composition failed — try again.' }, { status: 422 });
+    }
   }
 
   return NextResponse.json(parsed);

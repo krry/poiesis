@@ -218,7 +218,10 @@ export default function ComposerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ poem, styleHints, imageHints, audioHints }),
       });
-      if (!editResp.ok) throw new Error(await editResp.text());
+      if (!editResp.ok) {
+        const body = await editResp.json().catch(() => null);
+        throw new Error(body?.error ?? 'Composition failed — try again.');
+      }
       const editorResult: EditorResult = await editResp.json();
       setResult(editorResult);
       setPipeline('illustrating');
