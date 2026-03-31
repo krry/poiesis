@@ -34,7 +34,7 @@ async function gatewayImage(prompt: string): Promise<ImageResult> {
   const file = result.files?.[0];
   if (!file) throw new Error(`Gateway returned no image file (model: ${IMAGE_MODEL})`);
 
-  const mime = file.mimeType ?? 'image/jpeg';
+  const mime = file.mediaType ?? 'image/jpeg';
   const b64  = file.base64;
   if (!b64) throw new Error('Gateway image missing base64 data');
 
