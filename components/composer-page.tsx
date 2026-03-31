@@ -288,14 +288,15 @@ export default function ComposerPage() {
           <div className="flex flex-col flex-1 min-h-0 gap-3 p-4 md:p-6 overflow-y-auto">
 
             {/* Editor — fills available height */}
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground/40 uppercase tracking-widest select-none">Lyrics or verses ↓</span>
               <PoetryEditor
                 value={poem}
                 onChange={updatePoem}
                 onSubmit={compose}
                 onBlur={handleEditorBlur}
                 font={font}
-                className="h-full"
+                className="flex-1"
                 placeholder={"One need not be a Chamber — to be Haunted —\nOne need not be a House —\nThe Brain has Corridors — surpassing\nMaterial Place —\nFar safer, of a Midnight — meeting\nExternal Ghost —\nThan an Interior — confronting —\nThat Cooler Host —\nFar safer, through an Abbey — gallop —\nThe Stones a'chase —\nThan Moonless — One's A'self encounter —\nIn lonesome Place —\nOurself — behind Ourself — Concealed —\nShould startle — most —\nAssassin — hid in Our Apartment —\nBe Horror's least —\nThe Prudent — carries a Revolver —\nHe bolts the Door —\nO'erlooking a Superior Spectre —\nMore near —"}
               />
             </div>
@@ -315,27 +316,30 @@ export default function ComposerPage() {
 
               <button
                 onClick={() => setSurpriseMode(m => m === 'tarot' ? 'classics' : 'tarot')}
-                className="text-base leading-none text-muted-foreground/40 hover:text-muted-foreground transition-colors px-1"
+                className="flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2 py-1 rounded border border-border/50 hover:border-border"
                 title={surpriseMode === 'tarot' ? 'Switch to classics' : 'Switch to tarot'}
               >
-                {surpriseMode === 'tarot' ? '🎴' : '📜'}
+                <span>{surpriseMode === 'tarot' ? '🎴' : '📜'}</span>
+                <span>{surpriseMode === 'tarot' ? 'Tarot' : 'Classics'}</span>
               </button>
 
               <button
                 onClick={surprise}
                 title="Surprise me"
                 aria-label="Surprise me with a poem"
-                className="p-1.5 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50 transition-colors"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-colors text-xs"
               >
-                <Gift size={14} />
+                <Gift size={13} />
+                <span>Surprise</span>
               </button>
             </div>
 
-            {/* Hints */}
+            {/* Embellishments */}
             <details className="group shrink-0">
-              <summary className="text-xs uppercase tracking-widest text-muted-foreground cursor-pointer select-none py-1 flex items-center gap-2">
-                <span>Hints &amp; inspirations</span>
+              <summary className="cursor-pointer select-none py-2.5 px-4 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground">
+                <span>Embellishments</span>
                 {suggesting && <BrailleSpinner className="text-muted-foreground/40 font-mono text-sm" />}
+                <span className="text-muted-foreground/40 transition-transform duration-200 group-open:rotate-180">▾</span>
               </summary>
               <div className="mt-3 flex flex-col gap-3">
                 <HintField
