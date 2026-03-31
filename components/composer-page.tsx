@@ -503,9 +503,45 @@ function parseStanzas(polished: string): StanzaBlock[] {
   return out;
 }
 
+// ── Annotation popover ────────────────────────────────────────────────────────
+
+interface AnnPopoverProps {
+  ann: { stage: string; note: string };
+  annKey: string;
+  openKey: string | null;
+  setOpenKey: (k: string | null) => void;
+}
+
+function AnnPopover({ ann, annKey, openKey, setOpenKey }: AnnPopoverProps) {
+  const isOpen = openKey === annKey;
+  return (
+    <span className="relative inline-flex items-center">
+      <button
+        onClick={e => { e.stopPropagation(); setOpenKey(isOpen ? null : annKey); }}
+        className={[
+          'ml-1 w-3.5 h-3.5 inline-flex items-center justify-center rounded text-[9px] transition-colors',
+          isOpen
+            ? 'text-blue-400 bg-blue-400/15'
+            : 'text-muted-foreground/20 hover:text-blue-400/60 hover:bg-blue-400/10',
+        ].join(' ')}
+        aria-label="Show annotation"
+      >
+        ✦
+      </button>
+      {isOpen && (
+        <div className="absolute z-20 right-0 top-5 w-64 rounded-lg border border-blue-400/20 bg-popover shadow-xl p-3 flex flex-col gap-1.5">
+          <p className="text-[10px] text-blue-400/70 uppercase tracking-wider font-medium leading-snug">{ann.stage}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">{ann.note}</p>
+        </div>
+      )}
+    </span>
+  );
+}
+
 function IntegratedView({ result, font }: { result: EditorResult; font: string }) {
   const fontFamily = FONT_VARS[font] ?? FONT_VARS.inconsolata;
 
+  const [openAnn, setOpenAnn] = useState<string | null>(null);
   const [images, setImages] = useState<Record<number, { url?: string; loading?: boolean; error?: string }>>({});
   const [playingIdx, setPlayingIdx] = useState(-1);
   const audioRef   = useRef<HTMLAudioElement | null>(null);
@@ -601,7 +637,8 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
         const narText = narLines.map(n => n.text).join(' ');
         const narIdx  = narLines.length ? narScript.indexOf(narLines[0]) : -1;
 
-        const anns = (result.annotations ?? []).filter(
+        const allAnns = result.annotations ?? [];
+        const anns = allAnns.filter(
           a => a.lines[0] <= stanzaEnd && a.lines[1] >= stanza.startLine,
         );
 
@@ -631,7 +668,12 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
               {/* Lines */}
               <div className="flex-1 min-w-0">
                 {stanza.lines.map((line, li) => {
-                  const isLast = li === stanza.lines.length - 1;
+                  const lineNum = stanza.startLine + li;
+                  const isLast  = li === stanza.lines.length - 1;
+                  // annotations whose anchor is this line (clipped to stanza end)
+                  const lineAnns = anns.filter(
+                    a => Math.min(a.lines[1], stanzaEnd) === lineNum,
+                  );
                   return (
                     <div key={li} className="flex items-baseline justify-between gap-2 group/line">
                       <span
@@ -639,6 +681,18 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
                         className="text-foreground"
                       >
                         {line || '\u00a0'}
+                        {lineAnns.map(ann => {
+                          const annKey = `${si}-${allAnns.indexOf(ann)}`;
+                          return (
+                            <AnnPopover
+                              key={annKey}
+                              ann={ann}
+                              annKey={annKey}
+                              openKey={openAnn}
+                              setOpenKey={setOpenAnn}
+                            />
+                          );
+                        })}
                       </span>
                       {isLast && narIdx >= 0 && (
                         <button
@@ -653,17 +707,6 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
                 })}
               </div>
             </div>
-
-            {anns.length > 0 && (
-              <div className="pl-[68px] flex flex-col gap-1">
-                {anns.map((ann, ai) => (
-                  <div key={ai} className="flex items-start gap-2 text-xs">
-                    <span className="text-blue-400/70 uppercase tracking-wider shrink-0 pt-px">{ann.stage}</span>
-                    <span className="text-muted-foreground leading-relaxed">{ann.note}</span>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {img?.error && (
               <p className="pl-[68px] text-xs text-destructive/70">{img.error}</p>

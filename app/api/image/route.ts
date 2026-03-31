@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { gateway } from '@ai-sdk/gateway';
 
-const IMAGE_MODEL = process.env.IMAGE_MODEL || 'google/gemini-2.0-flash-preview-image-generation';
+export const maxDuration = 60;
+
+const IMAGE_MODEL = process.env.IMAGE_MODEL || 'google/gemini-3.1-flash-image-preview';
 
 type ImageResult = { type: 'b64'; value: string };
 
@@ -10,8 +12,8 @@ type ImageResult = { type: 'b64'; value: string };
 // new gen.pollinations.ai subdomain, causing 401s when the browser fetches directly.
 async function pollinationsImage(prompt: string): Promise<ImageResult> {
   const seed = Math.floor(Math.random() * 2 ** 31);
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&seed=${seed}`;
-  const resp = await fetch(url, { headers: { Referer: 'https://poiesis.kerry.ink' } });
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&seed=${seed}&nologo=true`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(45_000) });
   if (!resp.ok) throw new Error(`Pollinations ${resp.status}`);
   const mime = resp.headers.get('content-type') ?? 'image/jpeg';
   const buf = await resp.arrayBuffer();
@@ -23,16 +25,18 @@ async function gatewayImage(prompt: string): Promise<ImageResult> {
   const result = await generateText({
     model: gateway(IMAGE_MODEL),
     prompt,
-    abortSignal: AbortSignal.timeout(25_000),
+    providerOptions: {
+      google: { responseModalities: ['IMAGE'] },
+    },
+    abortSignal: AbortSignal.timeout(30_000),
   });
 
   const file = result.files?.[0];
-  if (!file) throw new Error('Gateway returned no image file');
+  if (!file) throw new Error(`Gateway returned no image file (model: ${IMAGE_MODEL})`);
 
-  // GeneratedFile has .base64, .mimeType, and optionally .uint8Array
   const mime = file.mimeType ?? 'image/jpeg';
   const b64  = file.base64;
-  if (!b64) throw new Error('Gateway image has no base64 data');
+  if (!b64) throw new Error('Gateway image missing base64 data');
 
   return { type: 'b64', value: `data:${mime};base64,${b64}` };
 }
@@ -49,11 +53,12 @@ export async function POST(req: NextRequest) {
   let result: ImageResult;
   try {
     result = await gatewayImage(prompt);
-  } catch {
-    // Gateway failed — fall back to Pollinations
+  } catch (gatewayErr) {
+    console.error('[image] gateway failed:', gatewayErr instanceof Error ? gatewayErr.message : gatewayErr);
     try {
       result = await pollinationsImage(prompt);
-    } catch {
+    } catch (pollinationsErr) {
+      console.error('[image] pollinations failed:', pollinationsErr instanceof Error ? pollinationsErr.message : pollinationsErr);
       return NextResponse.json({ error: 'Image generation unavailable' }, { status: 503 });
     }
   }
