@@ -86,24 +86,30 @@ interface HintFieldProps {
 }
 
 function HintField({ label, value, onChange, placeholder, suggestion }: HintFieldProps) {
-  function applySuggestion() {
-    const sep = value.trim() ? ', ' : '';
-    onChange(value.trim() + sep + suggestion);
-  }
-
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs text-muted-foreground uppercase tracking-wider">{label}</span>
-      <textarea
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        rows={2}
-        placeholder={placeholder}
-        className="text-sm bg-muted/30 border border-border rounded-md p-2 resize-none outline-none focus:border-ring"
-      />
+      <div className="relative">
+        <textarea
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          rows={2}
+          placeholder={placeholder}
+          className="w-full text-sm bg-muted/30 border border-border rounded-md p-2 pr-6 resize-none outline-none focus:border-ring"
+        />
+        {value && (
+          <button
+            onClick={() => onChange('')}
+            aria-label={`Clear ${label}`}
+            className="absolute top-1.5 right-1.5 w-4 h-4 flex items-center justify-center rounded-full text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/60 transition-colors text-[11px] leading-none"
+          >
+            ✕
+          </button>
+        )}
+      </div>
       {suggestion && (
         <button
-          onClick={applySuggestion}
+          onClick={() => onChange(suggestion!)}
           className="self-start text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors italic"
         >
           ✦ {suggestion}
