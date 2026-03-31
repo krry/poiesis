@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { Pool } from '@neondatabase/serverless';
+import { Kysely, PostgresDialect } from 'kysely';
 import { nextCookies } from 'better-auth/next-js';
 import { SignJWT, importPKCS8 } from 'jose';
 
@@ -9,6 +10,7 @@ import { SignJWT, importPKCS8 } from 'jose';
 const pool = new Pool({
   connectionString: process.env.AUTH_DB_URL ?? process.env.POIESIS_NEON_DB_URL!,
 });
+const db = new Kysely({ dialect: new PostgresDialect({ pool }) });
 
 // Apple requires a signed JWT as client secret — regenerate at startup
 async function appleClientSecret(): Promise<string> {
@@ -58,7 +60,7 @@ if (process.env.OAUTH_APPLE_CLIENT_ID && appleSecret) {
 }
 
 export const auth = betterAuth({
-  database: pool,
+  database: { db, type: 'postgres' },
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
   emailAndPassword: {
