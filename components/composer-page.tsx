@@ -513,6 +513,15 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
 
   const stanzas = useMemo(() => parseStanzas(result.polished ?? ''), [result.polished]);
 
+  // Auto-preload all stanza images as soon as the result arrives
+  useEffect(() => {
+    const prompts = result.midjourney_prompts ?? [];
+    for (const mjp of prompts) {
+      generateImage(mjp.stanza, mjp.prompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
   async function generateImage(stanzaNum: number, prompt: string) {
     setImages(prev => ({ ...prev, [stanzaNum]: { loading: true } }));
     try {
@@ -581,7 +590,7 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
 
         const narScript = result.narration_script ?? [];
         const narLines = narScript.filter(
-          n => n.lines[0] >= stanza.startLine && n.lines[0] <= stanzaEnd,
+          n => n.text && n.lines[0] >= stanza.startLine && n.lines[0] <= stanzaEnd,
         );
         const narText = narLines.map(n => n.text).join(' ');
         const narIdx  = narLines.length ? narScript.indexOf(narLines[0]) : -1;

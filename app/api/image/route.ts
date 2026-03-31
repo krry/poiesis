@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { generateText } from 'ai';
+import { gateway } from '@ai-sdk/gateway';
 
-const GOOGLE_KEY         = process.env.GOOGLE_API_KEY;
-const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.0-flash-preview-image-generation';
+const IMAGE_MODEL = process.env.IMAGE_MODEL || 'google/gemini-2.0-flash-preview-image-generation';
 
 type ImageResult = { type: 'b64'; value: string };
 
@@ -18,24 +19,22 @@ async function pollinationsImage(prompt: string): Promise<ImageResult> {
   return { type: 'b64', value: `data:${mime};base64,${b64}` };
 }
 
-async function geminiImage(prompt: string): Promise<ImageResult> {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${GOOGLE_KEY}`;
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ['IMAGE'] },
-    }),
+async function gatewayImage(prompt: string): Promise<ImageResult> {
+  const result = await generateText({
+    model: gateway(IMAGE_MODEL),
+    prompt,
+    abortSignal: AbortSignal.timeout(25_000),
   });
-  if (!resp.ok) throw new Error(`Gemini ${resp.status}: ${await resp.text()}`);
-  const data = await resp.json();
-  const part = data.candidates?.[0]?.content?.parts?.find(
-    (p: { inlineData?: { data: string; mimeType: string } }) => p.inlineData,
-  );
-  if (!part) throw new Error('Gemini returned no image');
-  const { data: b64, mimeType } = part.inlineData;
-  return { type: 'b64', value: `data:${mimeType};base64,${b64}` };
+
+  const file = result.files?.[0];
+  if (!file) throw new Error('Gateway returned no image file');
+
+  // GeneratedFile has .base64, .mimeType, and optionally .uint8Array
+  const mime = file.mimeType ?? 'image/jpeg';
+  const b64  = file.base64;
+  if (!b64) throw new Error('Gateway image has no base64 data');
+
+  return { type: 'b64', value: `data:${mime};base64,${b64}` };
 }
 
 export async function POST(req: NextRequest) {
@@ -49,16 +48,12 @@ export async function POST(req: NextRequest) {
 
   let result: ImageResult;
   try {
-    result = GOOGLE_KEY ? await geminiImage(prompt) : await pollinationsImage(prompt);
+    result = await gatewayImage(prompt);
   } catch {
-    if (GOOGLE_KEY) {
-      // Gemini failed — try Pollinations
-      try {
-        result = await pollinationsImage(prompt);
-      } catch {
-        return NextResponse.json({ error: 'Image generation unavailable' }, { status: 503 });
-      }
-    } else {
+    // Gateway failed — fall back to Pollinations
+    try {
+      result = await pollinationsImage(prompt);
+    } catch {
       return NextResponse.json({ error: 'Image generation unavailable' }, { status: 503 });
     }
   }
