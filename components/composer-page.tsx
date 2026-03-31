@@ -275,32 +275,6 @@ export default function ComposerPage() {
         <div className="flex items-center gap-3">
           <AuthWidget />
           <ThemeToggle />
-          {/* Flow steps: words → look → feel → sound → magic */}
-          <div className="flex items-center gap-0.5 text-[11px] font-mono">
-            {FLOW_STEPS.map((step, i) => {
-              const activeStep = PIPELINE_TO_FLOW[pipeline];
-              const activeIdx  = activeStep ? FLOW_STEPS.indexOf(activeStep) : -1;
-              const stepIdx    = i;
-              const isActive   = step === activeStep;
-              const isPast     = activeIdx >= 0 && stepIdx < activeIdx;
-              return (
-                <span key={step} className="flex items-center gap-0.5">
-                  <span className={[
-                    'px-1.5 py-0.5 rounded transition-colors',
-                    isActive  ? 'text-foreground bg-primary/20 font-semibold' :
-                    isPast    ? 'text-muted-foreground/60' :
-                    pipeline === 'idle' ? 'text-muted-foreground/30' :
-                    'text-muted-foreground/20',
-                  ].join(' ')}>
-                    {step}
-                  </span>
-                  {i < FLOW_STEPS.length - 1 && (
-                    <span className="text-muted-foreground/20">→</span>
-                  )}
-                </span>
-              );
-            })}
-          </div>
         </div>
       </header>
 
@@ -419,7 +393,15 @@ export default function ComposerPage() {
 
           <div className="flex-1 md:overflow-y-auto p-4 md:p-6">
             {!result && pipeline === 'idle' && (
-              <div className="flex items-center justify-center h-full min-h-[10rem]">
+              <div className="flex flex-col items-center justify-center h-full min-h-[10rem] gap-4">
+                <div className="flex items-center gap-0.5 text-[11px] font-mono">
+                  {FLOW_STEPS.map((step, i) => (
+                    <span key={step} className="flex items-center gap-0.5">
+                      <span className="px-1.5 py-0.5 rounded text-muted-foreground/30">{step}</span>
+                      {i < FLOW_STEPS.length - 1 && <span className="text-muted-foreground/20">→</span>}
+                    </span>
+                  ))}
+                </div>
                 <p className="text-muted-foreground/30 text-sm tracking-widest uppercase select-none">
                   your composition will appear here
                 </p>
