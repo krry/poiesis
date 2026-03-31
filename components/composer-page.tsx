@@ -288,7 +288,7 @@ export default function ComposerPage() {
           <div className="flex flex-col flex-1 min-h-0 gap-3 p-4 md:p-6 overflow-y-auto">
 
             {/* Editor — fills available height */}
-            <div className="flex-1 min-h-0 flex flex-col gap-1">
+            <div className="flex-1 min-h-[13rem] flex flex-col gap-1">
               <span className="text-xs text-muted-foreground/40 uppercase tracking-widest select-none">Lyrics or verses ↓</span>
               <PoetryEditor
                 value={poem}
@@ -343,21 +343,21 @@ export default function ComposerPage() {
               </summary>
               <div className="mt-3 flex flex-col gap-3">
                 <HintField
-                  label="Style inspirations"
+                  label="Lyrical style"
                   value={styleHints}
                   onChange={updateStyle}
                   placeholder="e.g. Lucille Clifton, late Neruda, wabi-sabi…"
                   suggestion={suggestions?.style ?? null}
                 />
                 <HintField
-                  label="Image mood"
+                  label="Visual style"
                   value={imageHints}
                   onChange={updateImage}
                   placeholder="e.g. cold neon city, wet pavement, sodium haze…"
                   suggestion={suggestions?.image ?? null}
                 />
                 <HintField
-                  label="Voice mood"
+                  label="Oral style"
                   value={audioHints}
                   onChange={updateAudio}
                   placeholder="e.g. low, intimate, slow with long silences…"
