@@ -28,7 +28,8 @@ export default function SignInPage() {
 
   async function social(provider: 'google' | 'github' | 'apple') {
     setBusy(true);
-    await signIn.social({ provider, callbackURL: '/' });
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+    await signIn.social({ provider, callbackURL: `${base}/` });
   }
 
   return (
