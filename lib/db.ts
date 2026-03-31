@@ -8,17 +8,24 @@ let _initPromise: Promise<void> | null = null;
 
 export function initDb(): Promise<void> {
   if (!_initPromise) {
-    _initPromise = sql`
-      CREATE TABLE IF NOT EXISTS sessions (
-        id         TEXT        PRIMARY KEY,
-        raw_poem   TEXT        NOT NULL,
-        style_hints TEXT,
-        image_hints TEXT,
-        audio_hints TEXT,
-        editor_result JSONB,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `.then(() => undefined);
+    _initPromise = (async () => {
+      await sql`
+        CREATE TABLE IF NOT EXISTS sessions (
+          id            TEXT        PRIMARY KEY,
+          raw_poem      TEXT        NOT NULL,
+          style_hints   TEXT,
+          image_hints   TEXT,
+          audio_hints   TEXT,
+          editor_result JSONB,
+          user_id       TEXT,
+          created_at    TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+      // Idempotent migration: add user_id to tables created before this column existed
+      await sql`
+        ALTER TABLE sessions ADD COLUMN IF NOT EXISTS user_id TEXT
+      `;
+    })();
   }
   return _initPromise;
 }

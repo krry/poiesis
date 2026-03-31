@@ -567,14 +567,39 @@ function IntegratedView({ result, font }: { result: EditorResult; font: string }
   async function generateImage(stanzaNum: number, prompt: string) {
     setImages(prev => ({ ...prev, [stanzaNum]: { loading: true } }));
     try {
-      const resp = await fetch('/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-      });
-      if (!resp.ok) throw new Error(await resp.text());
-      const data = await resp.json();
-      setImages(prev => ({ ...prev, [stanzaNum]: { url: data.value } }));
+      // Try gateway route first (Gemini via Vercel AI Gateway)
+      let url: string | null = null;
+      try {
+        const resp = await fetch('/api/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt }),
+          signal: AbortSignal.timeout(25_000),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          url = data.value ?? null;
+        }
+      } catch {
+        // gateway timed out or failed — fall through to Pollinations
+      }
+
+      if (!url) {
+        // Pollinations is CORS-open — fetch directly from the browser
+        const seed = Math.floor(Math.random() * 2 ** 31);
+        const polUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&model=turbo&seed=${seed}&nologo=true`;
+        const polResp = await fetch(polUrl);
+        if (!polResp.ok) throw new Error(`Pollinations ${polResp.status}`);
+        const blob = await polResp.blob();
+        url = await new Promise<string>((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result as string);
+          reader.onerror = rej;
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      setImages(prev => ({ ...prev, [stanzaNum]: { url } }));
     } catch (err) {
       setImages(prev => ({ ...prev, [stanzaNum]: { error: String(err) } }));
     }
