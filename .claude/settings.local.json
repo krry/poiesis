@@ -40,7 +40,10 @@
       "Bash(sips -s format png -z 32 32 \"/Users/kerry/house/keep/images/avatar/worfeus-avatar.png\" --out \"/tmp/favicon-32.png\")",
       "Bash(convert /tmp/favicon-32.png /Users/kerry/house/cabinet/orfx-site/public/favicon.ico)",
       "Bash(npm run:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "WebFetch(domain:www.better-auth.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm install:*)"
     ]
   }
 }

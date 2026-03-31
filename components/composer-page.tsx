@@ -8,6 +8,7 @@ import { Gift } from 'lucide-react';
 import { TAROT } from '@/lib/tarot';
 import { randomClassic } from '@/lib/poem-library';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { AuthWidget } from '@/components/auth-widget';
 
 const FONTS = [
   { id: 'inconsolata', label: 'Inconsolata' },
@@ -271,7 +272,8 @@ export default function ComposerPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <AuthWidget />
           <ThemeToggle />
           {/* Flow steps: words → look → feel → sound → magic */}
           <div className="flex items-center gap-0.5 text-[11px] font-mono">

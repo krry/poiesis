@@ -6,6 +6,14 @@ vi.mock('../lib/db', () => ({
   createSession: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock next/headers and auth — sessions route now calls auth.api.getSession
+vi.mock('next/headers', () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+vi.mock('../lib/auth', () => ({
+  auth: { api: { getSession: vi.fn().mockResolvedValue(null) } },
+}));
+
 describe('POST /api/sessions', () => {
   beforeEach(() => vi.clearAllMocks());
 

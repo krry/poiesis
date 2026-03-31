@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSession, initDb } from '@/lib/db';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
 
 // Rejection sampling eliminates modulo bias (256 % 36 = 4 would skew chars 0–3)
 function nanoid(len = 10): string {
@@ -26,7 +28,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'rawPoem too long (max 10,000 chars)' }, { status: 400 });
   }
 
+  const session = await auth.api.getSession({ headers: await headers() });
+  const userId = session?.user?.id ?? null;
+
   const id = nanoid();
-  await createSession({ id, rawPoem, styleHints, imageHints, audioHints, editorResult });
+  await createSession({ id, rawPoem, styleHints, imageHints, audioHints, editorResult, userId });
   return NextResponse.json({ id });
 }

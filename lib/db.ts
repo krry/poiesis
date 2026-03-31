@@ -41,20 +41,41 @@ export async function createSession(data: {
   imageHints?: string;
   audioHints?: string;
   editorResult?: EditorResult;
+  userId?: string | null;
 }) {
   await sql`
-    INSERT INTO sessions (id, raw_poem, style_hints, image_hints, audio_hints, editor_result)
+    INSERT INTO sessions (id, raw_poem, style_hints, image_hints, audio_hints, editor_result, user_id)
     VALUES (
       ${data.id},
       ${data.rawPoem},
       ${data.styleHints ?? null},
       ${data.imageHints ?? null},
       ${data.audioHints ?? null},
-      ${data.editorResult ? JSON.stringify(data.editorResult) : null}
+      ${data.editorResult ? JSON.stringify(data.editorResult) : null},
+      ${data.userId ?? null}
     )
     ON CONFLICT (id) DO UPDATE SET
       editor_result = EXCLUDED.editor_result
   `;
+}
+
+export async function getSessionsByUser(userId: string) {
+  const rows = await sql`
+    SELECT id, raw_poem, style_hints, image_hints, audio_hints, editor_result, created_at
+    FROM sessions
+    WHERE user_id = ${userId}
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return rows.map(row => ({
+    id: row.id as string,
+    rawPoem: row.raw_poem as string,
+    styleHints: row.style_hints as string | null,
+    imageHints: row.image_hints as string | null,
+    audioHints: row.audio_hints as string | null,
+    editorResult: isEditorResult(row.editor_result) ? row.editor_result : null,
+    createdAt: row.created_at as Date,
+  }));
 }
 
 export async function getSession(id: string) {
