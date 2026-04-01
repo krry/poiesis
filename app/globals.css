@@ -144,10 +144,11 @@ body::before {
   z-index: -1;
   pointer-events: none;
   will-change: transform;
+  /* Light mode: visible pastels — L 0.80–0.85, C 0.09–0.12 */
   background:
-    radial-gradient(ellipse 65% 55% at 15% 30%, oklch(0.96 0.04 280 / 0.70), transparent 70%),
-    radial-gradient(ellipse 55% 70% at 80% 60%, oklch(0.97 0.04 185 / 0.60), transparent 65%),
-    radial-gradient(ellipse 75% 45% at 50% 95%, oklch(0.97 0.04 350 / 0.55), transparent 65%);
+    radial-gradient(ellipse 65% 55% at 15% 30%, oklch(0.82 0.10 280 / 0.65), transparent 70%),
+    radial-gradient(ellipse 55% 70% at 80% 60%, oklch(0.85 0.09 185 / 0.58), transparent 65%),
+    radial-gradient(ellipse 75% 45% at 50% 95%, oklch(0.83 0.09 350 / 0.52), transparent 65%);
   animation: shimmer-a 30s ease-in-out infinite alternate;
 }
 
@@ -160,25 +161,25 @@ body::after {
   pointer-events: none;
   will-change: transform, filter;
   background:
-    radial-gradient(ellipse 60% 65% at 75% 20%, oklch(0.97 0.04 80  / 0.50), transparent 65%),
-    radial-gradient(ellipse 50% 60% at 20% 75%, oklch(0.96 0.04 220 / 0.55), transparent 60%);
+    radial-gradient(ellipse 60% 65% at 75% 20%, oklch(0.84 0.10 80  / 0.52), transparent 65%),
+    radial-gradient(ellipse 50% 60% at 20% 75%, oklch(0.83 0.09 220 / 0.57), transparent 60%);
   animation:
     shimmer-b   38s ease-in-out infinite alternate-reverse,
     shimmer-hue 55s linear      infinite;
 }
 
-/* Dark mode — lift lightness and chroma so shimmer reads on near-black */
+/* Dark mode — higher chroma + lightness so shimmer reads on near-black */
 .dark body::before {
   background:
-    radial-gradient(ellipse 65% 55% at 15% 30%, oklch(0.45 0.09 280 / 0.55), transparent 70%),
-    radial-gradient(ellipse 55% 70% at 80% 60%, oklch(0.48 0.09 185 / 0.50), transparent 65%),
-    radial-gradient(ellipse 75% 45% at 50% 95%, oklch(0.42 0.08 350 / 0.45), transparent 65%);
+    radial-gradient(ellipse 65% 55% at 15% 30%, oklch(0.55 0.14 280 / 0.65), transparent 70%),
+    radial-gradient(ellipse 55% 70% at 80% 60%, oklch(0.58 0.14 185 / 0.60), transparent 65%),
+    radial-gradient(ellipse 75% 45% at 50% 95%, oklch(0.52 0.12 350 / 0.55), transparent 65%);
 }
 
 .dark body::after {
   background:
-    radial-gradient(ellipse 60% 65% at 75% 20%, oklch(0.46 0.09 80  / 0.45), transparent 65%),
-    radial-gradient(ellipse 50% 60% at 20% 75%, oklch(0.44 0.09 220 / 0.50), transparent 60%);
+    radial-gradient(ellipse 60% 65% at 75% 20%, oklch(0.56 0.14 80  / 0.58), transparent 65%),
+    radial-gradient(ellipse 50% 60% at 20% 75%, oklch(0.54 0.13 220 / 0.62), transparent 60%);
 }
 
 @keyframes shimmer-a {
