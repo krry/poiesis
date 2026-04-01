@@ -121,10 +121,89 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    background-color: var(--background);
   }
+  body {
+    @apply text-foreground;
+    background-color: transparent;
+    /* Creates a stacking context so ::before/::after z-index: -1
+       sits between html's solid color and body's content */
+    isolation: isolate;
+  }
+}
+
+/* ── Iridescent shimmer background ────────────────────────────────────── */
+
+/* Layer 1 — cool arc (violet → seafoam → rose), drifts slowly */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+  background:
+    radial-gradient(ellipse 65% 55% at 15% 30%, oklch(0.96 0.04 280 / 0.70), transparent 70%),
+    radial-gradient(ellipse 55% 70% at 80% 60%, oklch(0.97 0.04 185 / 0.60), transparent 65%),
+    radial-gradient(ellipse 75% 45% at 50% 95%, oklch(0.97 0.04 350 / 0.55), transparent 65%);
+  animation: shimmer-a 30s ease-in-out infinite alternate;
+}
+
+/* Layer 2 — warm arc (gold → cyan), drifts opposite + hue cycles */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform, filter;
+  background:
+    radial-gradient(ellipse 60% 65% at 75% 20%, oklch(0.97 0.04 80  / 0.50), transparent 65%),
+    radial-gradient(ellipse 50% 60% at 20% 75%, oklch(0.96 0.04 220 / 0.55), transparent 60%);
+  animation:
+    shimmer-b   38s ease-in-out infinite alternate-reverse,
+    shimmer-hue 55s linear      infinite;
+}
+
+/* Dark mode — lift lightness and chroma so shimmer reads on near-black */
+.dark body::before {
+  background:
+    radial-gradient(ellipse 65% 55% at 15% 30%, oklch(0.45 0.09 280 / 0.55), transparent 70%),
+    radial-gradient(ellipse 55% 70% at 80% 60%, oklch(0.48 0.09 185 / 0.50), transparent 65%),
+    radial-gradient(ellipse 75% 45% at 50% 95%, oklch(0.42 0.08 350 / 0.45), transparent 65%);
+}
+
+.dark body::after {
+  background:
+    radial-gradient(ellipse 60% 65% at 75% 20%, oklch(0.46 0.09 80  / 0.45), transparent 65%),
+    radial-gradient(ellipse 50% 60% at 20% 75%, oklch(0.44 0.09 220 / 0.50), transparent 60%);
+}
+
+@keyframes shimmer-a {
+  0%   { transform: translate( 0.0%,  0.0%); }
+  20%  { transform: translate(-2.0%,  1.5%); }
+  40%  { transform: translate( 1.5%, -2.0%); }
+  60%  { transform: translate(-1.0%,  2.5%); }
+  80%  { transform: translate( 2.0%, -1.5%); }
+  100% { transform: translate(-0.5%,  1.0%); }
+}
+
+@keyframes shimmer-b {
+  0%   { transform: translate( 0.0%,  0.0%); }
+  25%  { transform: translate( 1.5%, -2.0%); }
+  50%  { transform: translate(-2.0%,  1.0%); }
+  75%  { transform: translate( 1.0%,  2.0%); }
+  100% { transform: translate(-1.5%, -1.0%); }
+}
+
+@keyframes shimmer-hue {
+  from { filter: hue-rotate(  0deg); }
+  to   { filter: hue-rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after { animation: none; }
 }
