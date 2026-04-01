@@ -50,6 +50,9 @@ export async function createSession(data: {
   editorResult?: EditorResult;
   userId?: string | null;
 }) {
+  // Subquery resolves user_id only if that user exists — returns NULL otherwise.
+  // Prevents FK violations when auth sessions carry a user_id from another
+  // environment or a deleted account.
   await sql`
     INSERT INTO sessions (id, raw_poem, style_hints, image_hints, audio_hints, editor_result, user_id)
     VALUES (
@@ -59,7 +62,7 @@ export async function createSession(data: {
       ${data.imageHints ?? null},
       ${data.audioHints ?? null},
       ${data.editorResult ? JSON.stringify(data.editorResult) : null},
-      ${data.userId ?? null}
+      (SELECT id FROM "user" WHERE id = ${data.userId ?? null})
     )
     ON CONFLICT (id) DO UPDATE SET
       editor_result = EXCLUDED.editor_result
